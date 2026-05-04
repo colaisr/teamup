@@ -13,6 +13,7 @@ from app.schemas import (
     InviteRequest,
     MessageResponse,
     WorkspaceCreateRequest,
+    WorkspaceInviteOut,
     WorkspaceMemberOut,
     WorkspaceOut,
 )
@@ -123,6 +124,68 @@ def create_invite(
             )
         )
     return MessageResponse(message="Приглашение создано, но письмо не удалось отправить.")
+
+
+@router.get("/{workspace_id}/invites", response_model=list[WorkspaceInviteOut])
+def list_pending_invites(
+    workspace_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    member = _membership(db, workspace_id, current_user.id)
+    if not member:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
+    _check_admin_or_owner(member)
+
+    rows = (
+        db.query(WorkspaceInvite)
+        .filter(
+            WorkspaceInvite.workspace_id == workspace_id,
+            WorkspaceInvite.accepted_at.is_(None),
+            WorkspaceInvite.revoked_at.is_(None),
+        )
+        .order_by(WorkspaceInvite.created_at.desc())
+        .all()
+    )
+    return [
+        WorkspaceInviteOut(
+            id=row.id,
+            email=row.email,
+            role=row.role.value,
+            created_at=row.created_at,
+            expires_at=row.expires_at,
+        )
+        for row in rows
+    ]
+
+
+@router.post("/{workspace_id}/invites/{invite_id}/revoke", response_model=MessageResponse)
+def revoke_invite(
+    workspace_id: str,
+    invite_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    member = _membership(db, workspace_id, current_user.id)
+    if not member:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
+    _check_admin_or_owner(member)
+
+    invite = (
+        db.query(WorkspaceInvite)
+        .filter(WorkspaceInvite.id == invite_id, WorkspaceInvite.workspace_id == workspace_id)
+        .first()
+    )
+    if not invite:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invite not found")
+    if invite.accepted_at:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invite already accepted")
+    if invite.revoked_at:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invite already revoked")
+
+    invite.revoked_at = datetime.utcnow()
+    db.commit()
+    return MessageResponse(message="Приглашение отменено.")
 
 
 @router.post("/invites/accept", response_model=MessageResponse)

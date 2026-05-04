@@ -1,38 +1,20 @@
-"use client";
+import { Suspense } from "react";
+import AcceptInviteClient from "./AcceptInviteClient";
+import { t } from "@/lib/i18n";
 
-import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { api } from "@/lib/api";
-
-export default function AcceptInvitePage() {
-  const params = useSearchParams();
-  const token = params.get("token");
-  const [status, setStatus] = useState("Ожидание...");
-
-  useEffect(() => {
-    async function run() {
-      if (!token) {
-        setStatus("Токен приглашения не найден");
-        return;
-      }
-      try {
-        const res = await api<{ message: string }>("/api/workspaces/invites/accept", {
-          method: "POST",
-          body: JSON.stringify({ token })
-        });
-        setStatus(res.message);
-      } catch (err: any) {
-        setStatus(err.message || "Ошибка принятия приглашения");
-      }
-    }
-    run();
-  }, [token]);
-
+function AcceptFallback() {
   return (
     <main style={{ maxWidth: 520, margin: "80px auto", padding: 20 }}>
-      <h1>Принятие приглашения</h1>
-      <p>{status}</p>
+      <h1>{t("invite.title")}</h1>
+      <p>{t("common.loading")}</p>
     </main>
   );
 }
 
+export default function AcceptInvitePage() {
+  return (
+    <Suspense fallback={<AcceptFallback />}>
+      <AcceptInviteClient />
+    </Suspense>
+  );
+}

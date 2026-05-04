@@ -57,6 +57,14 @@ class InviteAcceptRequest(BaseModel):
     token: str
 
 
+class WorkspaceInviteOut(BaseModel):
+    id: str
+    email: EmailStr
+    role: str
+    created_at: datetime
+    expires_at: datetime
+
+
 class WorkspaceMemberOut(BaseModel):
     user_id: str
     email: EmailStr

@@ -301,6 +301,47 @@ Commercial options:
 - Enterprise tier later.
 - White-label licensing later.
 
+## Implementation wiki (living)
+
+This section tracks **what is implemented in this repository** today. Product vision and backlog remain in §9–§12; phase-by-phase status is summarized in [`MVP_IMPLEMENTATION_PLAN.md`](MVP_IMPLEMENTATION_PLAN.md) §3.2.
+
+### Repository and layout
+
+| Item | Detail |
+|------|--------|
+| **Repo** | [github.com/colaisr/teamup](https://github.com/colaisr/teamup) — monorepo |
+| **`backend/`** | FastAPI, SQLAlchemy, JWT auth, routers under `/api/` |
+| **`frontend/`** | Next.js 14 App Router (`app/`), Russian-first i18n (`ru` primary, `en` fallback / ready) |
+| **`infra/`** | Docker Compose and deployment-oriented assets |
+| **`docs/`** | Product glossary, OAuth phase-2 notes, pilot runbook, etc. |
+| **Secrets** | `.env*` not committed; root `.env.example` documents variables |
+
+### Phase 1 platform (implemented)
+
+- **Auth:** registration, login, JWT `Bearer` API access, email verification flow.
+- **Workspaces:** roles `owner` / `admin` / `member`; a **personal workspace** is ensured on register, login, and `GET /api/auth/me`.
+- **Invitations:** create and accept invites; **`GET`** pending invites; **`POST /api/workspaces/{workspace_id}/invites/{invite_id}/revoke`** to revoke.
+- **Shell UX:** authenticated layout aligned with Research Flow — sidebar, workspace switcher, user card; gear opens **user settings** (`/settings/user`). **System admin** (DB flag `users.is_system_admin`) sees shield affordance → **`/settings/system`** (platform-level tools where implemented).
+- **Settings routes:** `/settings/workspace`, `/settings/members`, `/settings/integrations`, plus onboarding under `/onboarding/clickup` and `/onboarding/mapping`.
+- **CI:** GitHub Actions (`.github/workflows/ci.yml`): backend tests (`pytest`), `compileall`; frontend ESLint and `next build`. Auth-related pages wrap `useSearchParams` usage in **`Suspense`** for Next compatibility.
+
+### ClickUp integration (partial)
+
+- **Personal API token** path: connect, scope selection, validation against ClickUp. **OAuth** is intentionally deferred (`docs/CLICKUP_OAUTH_PHASE2.md`).
+- **Ingestion:** on-demand historical import into normalized models (`Task`, `TaskTransition`, raw event storage); **no** production-grade incremental Celery/sync loop yet.
+
+### Analytics and product UI (partial)
+
+- **Metrics API:** `GET /api/analytics/metrics/{workspace_id}` — lead/cycle medians, rework/reopen-oriented signals, time-in-status rollup (subset of full MVP metric list).
+- **Attention API:** `GET /api/analytics/attention/{workspace_id}` — scored tasks with textual explanations (rule-based v1).
+- **App surfaces:** **`/dashboard`**, **`/attention`**, **`/impact`** with workspace context; fuller dashboard parity (deep bottleneck cards, rich filters, trend charts) vs §9 MVP wording is **still open**.
+
+### Gaps versus full MVP wording (§9)
+
+- Incremental scheduled sync, stronger observability/retry narratives, hardened “no analytics until mapping confirmed,” baseline/value automation in Impact, PostgreSQL-heavy CI parity — see [`MVP_IMPLEMENTATION_PLAN.md`](MVP_IMPLEMENTATION_PLAN.md) cross-cutting notes.
+
+---
+
 ## 12) Product Roadmap (High-level)
 
 ### Phase 1 (0-2 months)

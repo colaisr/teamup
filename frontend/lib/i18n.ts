@@ -60,6 +60,20 @@ const ru: Dict = {
   "onboarding.mapping.title": "Маппинг статусов",
   "verify.success": "Почта подтверждена",
   "verify.error": "Ошибка подтверждения",
+  "invite.title": "Принятие приглашения",
+  "invite.status.waiting": "Ожидание…",
+  "invite.error.noToken": "Токен приглашения не найден",
+  "invite.error.generic": "Ошибка принятия приглашения",
+  "settings.members.workspaceId.placeholder": "ID workspace (берётся из меню автоматически)",
+  "settings.members.email.placeholder": "Email участника",
+  "settings.members.invite": "Пригласить",
+  "settings.members.loadMembers": "Обновить список участников",
+  "settings.members.pendingTitle": "Активные приглашения",
+  "settings.members.loadPending": "Загрузить приглашения",
+  "settings.members.noWorkspace": "Выберите рабочее пространство в меню или укажите его ID.",
+  "settings.members.revoke": "Отозвать",
+  "settings.members.role.member": "участник",
+  "settings.members.role.admin": "администратор",
   "common.loading": "Загрузка..."
 };
 

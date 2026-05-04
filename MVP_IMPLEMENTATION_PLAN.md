@@ -113,6 +113,29 @@ flowchart TD
     impact --> dashboard
 ```
 
+### 3.2 Current implementation status (living)
+
+Monorepo: `backend/` (FastAPI), `frontend/` (Next.js 14 App Router), `infra/`, `docs/`. Repository: [`colaisr/teamup`](https://github.com/colaisr/teamup). `.env`/secrets excluded from Git; `.env.example` at repo root; local DB often SQLite (`*.db` gitignored).
+
+| Phase | Status | Notes |
+|-------|--------|--------|
+| **0 — Product foundations** | **Done** (docs) | Foundations, glossaries, pilot scope, permissions etc. under `docs/`. |
+| **1 — Bootstrap** | **Done** | Auth (JWT `Bearer`, `/api/auth/*`), registration + email verification, login; workspace model `owner` / `admin` / `member`; **personal workspace** auto-created on register/login/me; **invites**: create & accept (`POST`), **list pending** (`GET …/invites`), **revoke** (`POST …/invites/{id}/revoke`); FE shell mirrors Research Flow (sidebar + workspace switch + user card; gear → `/settings/user`); platform **system admin** via DB `users.is_system_admin` (shield → `/settings/system`); `.github/workflows/ci.yml`: backend `pytest` + `compileall`, frontend ESLint (`next lint`) + `next build`; verify/accept-invite pages use `<Suspense>` around `useSearchParams`. Celery not in Phase 1. |
+| **2 — ClickUp** | **Partial** | Personal API token: connect (`/api/integrations/clickup/connect`), scope (`…/scope`), validation via ClickUp API; **OAuth deferred** (`docs/CLICKUP_OAUTH_PHASE2.md`). |
+| **3 — Ingestion** | **Partial** | **On-demand historical import** (~90 days — list tasks + status history → `Task`, `TaskTransition`, `ClickUpRawEvent`). **No** scheduled incremental worker, Celery queue, or full retry/QC from plan yet. |
+| **4 — Mapping** | **Partial** | Save workflow mapping (`WorkflowMapping`), onboarding UI scaffolding; enforcement “no analytics until mapped” / auto-suggest from live statuses **still to harden**. |
+| **5 — Normalized storage** | **Partial** | SQLAlchemy models persist tasks, transitions, mappings, snapshots, integrations, invites, intervention logs etc.; Postgres in prod-compose example; SQLite common in dev. |
+| **6 — Metrics engine** | **Partial** | `GET /api/analytics/metrics/{workspace_id}`: median lead/cycle, rework/reopen rates, time-in-status rollup — **narrower than Phase 6 spec** (e.g. idle/throughput). |
+| **7 — Attention v1** | **Partial** | `GET /api/analytics/attention/{workspace_id}`: rule-based score + explanations; **thresholds/rules not fully aligned with Phase 7 spec.** |
+| **8 — Dashboard UI** | **Partial** | Routes: dashboard / attention / impact + workspace settings, members, integrations, onboarding — **no** full bottleneck cards / filters / weekly trend parity yet. |
+| **9 — Value / Impact** | **Partial** | Impact route + API groundwork; baseline snapshot UX/automation vs Definition of Done **still pending.** |
+| **10 — Pilot ops** | **Not started** | Process — see `docs/PILOT_RUNBOOK.md`. |
+| **8.5 / MVP+ AI** | **Not started** | — |
+
+Cross-cutting gaps vs DoD MVP: incremental sync + observability, stricter §3.1 i18n (eliminate stray hardcoded copy + missing-key checker), richer dashboard & impact parity, Postgres-backed parity tests where needed.
+
+See also **`PROJECT_OVERVIEW.md` § Implementation wiki.**
+
 ## 4) Execution Phases
 
 ### Phase 0 - Product and Metric Decisions
@@ -142,6 +165,8 @@ Deliverables:
 Exit criteria:
 
 - User can register, verify email, sign in, create workspace shell, and invite teammate.
+
+**Status:** Satisfied for this codebase; details are in §3.2 *Current implementation status*.
 
 ### Phase 2 - ClickUp Integration
 
