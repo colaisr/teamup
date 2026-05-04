@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Node
+node_modules/
+.next/
+dist/
+
+# Env and secrets
+.env
+.env.local
+.env.production
+
+# Logs and runtime
+*.log
+tmp/
+data/
+backups/
+
+# IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Local DB / dev artifacts (do not ship dev SQLite to remote)
+*.db
+
