@@ -19,7 +19,8 @@ TeamUp is a Russian-first engineering process optimization platform MVP.
 
 1. Copy env:
    - `cp .env.example .env`
-2. Run backend and frontend locally (see their README files).
+2. **PostgreSQL (optional, recommended):** `docker compose -f infra/docker-compose.postgres.yml up -d` from repo root (uses `localhost:5432`, same credentials as `.env.example`).
+3. Run backend and frontend locally (see their README files).
 3. Use Russian UI by default (`ru`).
 
 ## Phase 1 (bootstrap) status

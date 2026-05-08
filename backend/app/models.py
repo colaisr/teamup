@@ -35,6 +35,7 @@ class User(Base):
     full_name: Mapped[str] = mapped_column(String(255), default="")
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     is_system_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    last_active_workspace_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

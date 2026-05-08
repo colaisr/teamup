@@ -18,7 +18,7 @@ from app.schemas import (
     VerifyEmailRequest,
 )
 from app.security import create_access_token, create_random_token, hash_password, verify_password
-from app.services.workspaces import ensure_personal_workspace
+from app.services.workspaces import ensure_personal_workspace, sync_last_active_workspace
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -38,7 +38,8 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     db.add(user)
     db.flush()
     ensure_personal_workspace(db, user)
-
+    sync_last_active_workspace(db, user)
+    db.flush()
     token = create_random_token()
     verification = EmailVerificationToken(user_id=user.id, token=token)
     db.add(verification)
@@ -93,6 +94,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     if not user.is_verified:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email not verified")
     ensure_personal_workspace(db, user)
+    sync_last_active_workspace(db, user)
     db.commit()
     token = create_access_token(user.id)
     return TokenResponse(access_token=token)
@@ -100,13 +102,17 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 
 @router.get("/me", response_model=UserOut)
 def me(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    ensure_personal_workspace(db, current_user)
+    u = db.query(User).filter(User.id == current_user.id).first()
+    ensure_personal_workspace(db, u)
+    sync_last_active_workspace(db, u)
     db.commit()
+    db.refresh(u)
     return UserOut(
-        id=current_user.id,
-        email=current_user.email,
-        full_name=current_user.full_name,
-        is_verified=current_user.is_verified,
-        is_system_admin=user_is_platform_admin(current_user),
+        id=u.id,
+        email=u.email,
+        full_name=u.full_name,
+        is_verified=u.is_verified,
+        is_system_admin=user_is_platform_admin(u),
+        last_active_workspace_id=u.last_active_workspace_id,
     )
 

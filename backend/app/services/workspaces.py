@@ -45,4 +45,27 @@ def ensure_personal_workspace(db: Session, user: User) -> Workspace:
             role=WorkspaceRole.owner,
         )
     )
+    if not user.last_active_workspace_id:
+        user.last_active_workspace_id = workspace.id
     return workspace
+
+
+def sync_last_active_workspace(db: Session, user: User) -> None:
+    """Ensure last_active_workspace_id points at a workspace the user belongs to (InfraZen-style default)."""
+    rows = (
+        db.query(Workspace, WorkspaceMember.role)
+        .join(WorkspaceMember, WorkspaceMember.workspace_id == Workspace.id)
+        .filter(WorkspaceMember.user_id == user.id)
+        .order_by(Workspace.created_at.asc())
+        .all()
+    )
+    if not rows:
+        return
+    lid = user.last_active_workspace_id
+    if lid and any(w.id == lid for w, _ in rows):
+        return
+    for w, role in rows:
+        if is_personal_workspace(w, user, role):
+            user.last_active_workspace_id = w.id
+            return
+    user.last_active_workspace_id = rows[0][0].id

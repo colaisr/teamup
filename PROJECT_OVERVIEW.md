@@ -283,8 +283,8 @@ Minimum route groups for TeamUp MVP:
 
 - Public/Auth: landing, login, register, verify-email.
 - Onboarding: connect ClickUp, select scope, map statuses.
-- App: dashboard, attention, impact.
-- Settings/Admin: workspace settings, members/invites, integration settings.
+- App: dashboard, attention, impact (main nav); integrations entry when needed (`/settings/integrations`).
+- Settings/Admin: **workspace lifecycle** (create/rename/switch/members/invites) lives under **`/settings/user`** (tab «Рабочие пространства»), not as a duplicate top-level nav item; **`/settings/workspace`** / **`/settings/members`** redirect there; integration settings at **`/settings/integrations`**; system tools at **`/settings/system`** (system admins only).
 
 ## 11) Business and GTM Direction
 
@@ -318,11 +318,17 @@ This section tracks **what is implemented in this repository** today. Product vi
 
 ### Phase 1 platform (implemented)
 
-- **Auth:** registration, login, JWT `Bearer` API access, email verification flow.
-- **Workspaces:** roles `owner` / `admin` / `member`; a **personal workspace** is ensured on register, login, and `GET /api/auth/me`.
-- **Invitations:** create and accept invites; **`GET`** pending invites; **`POST /api/workspaces/{workspace_id}/invites/{invite_id}/revoke`** to revoke.
-- **Shell UX:** authenticated layout aligned with Research Flow — sidebar, workspace switcher, user card; gear opens **user settings** (`/settings/user`). **System admin** (DB flag `users.is_system_admin`) sees shield affordance → **`/settings/system`** (platform-level tools where implemented).
-- **Settings routes:** `/settings/workspace`, `/settings/members`, `/settings/integrations`, plus onboarding under `/onboarding/clickup` and `/onboarding/mapping`.
+- **Auth:** registration, login, JWT `Bearer` API access, email verification flow; optional sync of **`last_active_workspace_id`** on login/`me` when membership changes.
+- **Workspaces:** roles `owner` / `admin` / `member`; a **personal workspace** is ensured on register and when loading auth/me; **`GET /api/workspaces`** exposes **`is_current`** from persisted preference; **`POST /api/workspaces/{id}/switch`** updates **`users.last_active_workspace_id`** and aligns frontend `teamup_workspace_id` cache.
+- **Workspace administration (aligned with InfraZen-style UX):**
+  - **No HTTP delete** for a workspace (lifecycle is not torn down via public API).
+  - **Rename:** owner via **`PUT /api/workspaces/{id}`** (personal names retain the **` Personal`** suffix rule).
+  - **Member roles:** owner sets **`member` / `admin`** via **`PUT /api/workspaces/{id}/members/{user_id}`**; transferring ownership is out of scope for this shorthand.
+  - **Removal:** a user may leave (**`DELETE`** on self unless owner); removing **another** user is **owner-only** (not admin).
+  - **Invitations:** **`POST`** create, **`POST .../revoke`**, **`GET`** list — **owner-only**. Unknown emails get a pending token flow; **existing registered users are added immediately** (no pending row) where applicable.
+  - **Invite visibility:** **`GET .../invites?pending_only=true`** (pending) vs **`pending_only=false`** (full audit trail with **`pending` / `accepted` / `revoked`** statuses and timestamps).
+- **Shell UX:** authenticated layout — main nav (**dashboard, attention, impact, integrations**); workspace **switcher** in the sidebar footer; workspace **management** opens from the user card (**gear** → **`/settings/user`** → workspaces tab — no separate «Рабочие пространства» item in the main menu). **System admin** (`users.is_system_admin`) sees shield → **`/settings/system`** where implemented.
+- **Settings routes:** `/settings/workspace` and `/settings/members` redirect to **`/settings/user?tab=workspaces`**; `/settings/integrations`; onboarding **`/onboarding/clickup`**, **`/onboarding/mapping`**.
 - **CI:** GitHub Actions (`.github/workflows/ci.yml`): backend tests (`pytest`), `compileall`; frontend ESLint and `next build`. Auth-related pages wrap `useSearchParams` usage in **`Suspense`** for Next compatibility.
 
 ### ClickUp integration (partial)
