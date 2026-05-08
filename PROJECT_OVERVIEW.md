@@ -331,14 +331,19 @@ This section tracks **what is implemented in this repository** today. Product vi
 - **Settings routes:** `/settings/workspace` and `/settings/members` redirect to **`/settings/user?tab=workspaces`**; `/settings/integrations`; onboarding **`/onboarding/clickup`**, **`/onboarding/mapping`**.
 - **CI:** GitHub Actions (`.github/workflows/ci.yml`): backend tests (`pytest`), `compileall`; frontend ESLint and `next build`. Auth-related pages wrap `useSearchParams` usage in **`Suspense`** for Next compatibility.
 
-### ClickUp integration (partial)
+### ClickUp integration (partial — multi-connection MVP surface)
 
-- **Personal API token** path: connect, scope selection, validation against ClickUp. **OAuth** is intentionally deferred (`docs/CLICKUP_OAUTH_PHASE2.md`).
-- **Ingestion:** on-demand historical import into normalized models (`Task`, `TaskTransition`, raw event storage); **no** production-grade incremental Celery/sync loop yet.
+- **Personal API token** path; **OAuth** deferred (`docs/CLICKUP_OAUTH_PHASE2.md`).
+- **Multiple ClickUp connections** per TeamUp workspace (`clickup_connections` with **`connection_id`** on `tasks`, `task_transitions`, `clickup_raw_events`, `workflow_mappings`); DB migration/backfill helpers; PostgreSQL drops legacy **`uq_clickup_workspace`** when present.
+- **API (`/api/integrations/...`):** list/create connections by **`workspace_id`**; **`GET`/`PUT`** connection **credentials** (admin-only; **GET** returns decrypted token so the edit wizard can prefill a masked/saved token); scopes (teams/spaces/lists); scope save; statuses; workflow mapping CRUD; **POST import** per **`connection_id`**. Legacy “latest connection” wrappers remain where noted in code for older clients.
+- **Settings UI (`/settings/integrations`):** **list** of connections with **Синхронизировать / Редактировать / Отключить / Добавить**; full-screen **wizard** (credentials with verify + spinners → team/Space with refresh spinners → **обязательный** status mapping → done). Footer action order puts **«Назад»** left of primary actions. Workspace UUID override card removed (uses **`localStorage` `teamup_workspace_id`** from the sidebar switcher). **Редактировать** prefetch uses explicit team/Space IDs so selects stay populated after reload.
+- **Import:** parses ClickUp **`status`** as string or nested object (**`clickup_status_field_label`**); **`tasks.task_type`** column migrated to **`TEXT`** on PostgreSQL (custom-field JSON longer than VARCHAR(64)); user-facing error detail on failed import commits when possible.
+- **Sync:** Available once a **Space/scope id** exists (completion of status mapping remains required for **`ready`** and best analytics fidelity). Spinner on sync; **`last_synced_at`** displayed in **browser local time** (**`formatApiUtcAsLocal`** assumes naive API timestamps are UTC).
+- **Ingestion:** on-demand historical import (**~90 days** window in current logic); **no** production-grade scheduled incremental Celery/sync loop yet.
 
 ### Analytics and product UI (partial)
 
-- **Metrics API:** `GET /api/analytics/metrics/{workspace_id}` — lead/cycle medians, rework/reopen-oriented signals, time-in-status rollup (subset of full MVP metric list).
+- **Metrics API:** `GET /api/analytics/metrics/{workspace_id}` — lead/cycle medians, rework/reopen-oriented signals, time-in-status rollup (subset of full MVP metric list); **normalized status mapping respects per-connection workflows** with fallback where `connection_id` is missing on older rows.
 - **Attention API:** `GET /api/analytics/attention/{workspace_id}` — scored tasks with textual explanations (rule-based v1).
 - **App surfaces:** **`/dashboard`**, **`/attention`**, **`/impact`** with workspace context; fuller dashboard parity (deep bottleneck cards, rich filters, trend charts) vs §9 MVP wording is **still open**.
 

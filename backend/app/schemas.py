@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 
 class MessageResponse(BaseModel):
@@ -92,13 +94,44 @@ class WorkspaceMemberRoleUpdate(BaseModel):
 class ClickUpConnectRequest(BaseModel):
     workspace_id: str
     api_token: str
+    name: str | None = None
+
+
+class ClickUpCredentialsUpdateRequest(BaseModel):
+    api_token: str
+    name: str | None = None
+
+
+class ClickUpCredentialsSecretOut(BaseModel):
+    """Decrypted token for workspace admins editing an existing connection."""
+
+    api_token: str
+
+
+class ClickUpVerifyTokenRequest(BaseModel):
+    api_token: str = Field(min_length=1)
+
+
+class ClickUpVerifyTokenResponse(BaseModel):
+    ok: bool = True
+    clickup_email: str | None = None
 
 
 class ClickUpScopeRequest(BaseModel):
-    workspace_id: str
+    connection_id: str | None = None
+    workspace_id: str | None = None
     scope_type: str = "list"
     scope_id: str
     scope_name: str
+    clickup_team_id: str | None = None
+
+    @model_validator(mode="after")
+    def require_team_for_space(self) -> ClickUpScopeRequest:
+        if not (self.connection_id or self.workspace_id):
+            raise ValueError("connection_id or workspace_id is required")
+        if self.scope_type == "space" and not (self.clickup_team_id or "").strip():
+            raise ValueError("clickup_team_id is required when scope_type is space")
+        return self
 
 
 class WorkflowMappingItem(BaseModel):
@@ -107,10 +140,38 @@ class WorkflowMappingItem(BaseModel):
 
 
 class WorkflowMappingSaveRequest(BaseModel):
-    workspace_id: str
-    scope_type: str = "list"
+    connection_id: str | None = None
+    workspace_id: str | None = None
+    scope_type: str = Field(default="list", pattern=r"^(list|space)$")
     scope_id: str
     mappings: list[WorkflowMappingItem]
+
+    @model_validator(mode="after")
+    def require_connection_or_workspace(self) -> WorkflowMappingSaveRequest:
+        if not (self.connection_id or self.workspace_id):
+            raise ValueError("connection_id or workspace_id is required")
+        return self
+
+
+class ClickUpConnectionOut(BaseModel):
+    id: str
+    workspace_id: str
+    provider: str
+    name: str
+    clickup_user_label: str | None = None
+    setup_status: str
+    scope_type: str | None = None
+    scope_id: str | None = None
+    scope_name: str | None = None
+    clickup_team_id: str | None = None
+    last_synced_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ClickUpConnectionListOut(BaseModel):
+    workspace_id: str
+    connections: list[ClickUpConnectionOut]
 
 
 class AttentionTaskOut(BaseModel):

@@ -120,14 +120,14 @@ Monorepo: `backend/` (FastAPI), `frontend/` (Next.js 14 App Router), `infra/`, `
 | Phase | Status | Notes |
 |-------|--------|--------|
 | **0 — Product foundations** | **Done** (docs) | Foundations, glossaries, pilot scope, permissions etc. under `docs/`. |
-| **1 — Bootstrap** | **Done** | Auth (JWT `Bearer`, `/api/auth/*`), registration + email verification, login; workspace model `owner` / `admin` / `member`; **personal workspace** auto-created on register/login/me; **invites**: create & accept (`POST`), **list pending** (`GET …/invites`), **revoke** (`POST …/invites/{id}/revoke`); FE shell mirrors Research Flow (sidebar + workspace switch + user card; gear → `/settings/user`); platform **system admin** via DB `users.is_system_admin` (shield → `/settings/system`); `.github/workflows/ci.yml`: backend `pytest` + `compileall`, frontend ESLint (`next lint`) + `next build`; verify/accept-invite pages use `<Suspense>` around `useSearchParams`. Celery not in Phase 1. |
+| **1 — Bootstrap** | **Done** | Auth (JWT `Bearer`, `/api/auth/*`), registration + email verification, login; **`last_active_workspace_id`** persisted (`users`), **`GET /api/workspaces`** returns **`is_current`**, **`POST …/switch`** aligns server + frontend cache; **`PUT`** rename + member role updates (**owner**); **no workspace `DELETE`** from API (InfraZen-style); **invites** owner-only (**`GET`** full history vs pending via **`pending_only`**, **immediate membership** when invitee already registered); sidebar: **dashboard / attention / impact / integrations** + footer workspace switcher; workspaces **management** at **`/settings/user?tab=workspaces`** (**`/settings/workspace`** & **`/settings/members`** redirect); shield → **`/settings/system`** for **`is_system_admin`**. CI: `pytest`, `compileall`, ESLint, `next build`; auth pages `<Suspense>` for `useSearchParams`. Celery not in Phase 1. |
 | **2 — ClickUp** | **Partial** | Personal API token: connect (`/api/integrations/clickup/connect`), scope (`…/scope`), validation via ClickUp API; **OAuth deferred** (`docs/CLICKUP_OAUTH_PHASE2.md`). |
 | **3 — Ingestion** | **Partial** | **On-demand historical import** (~90 days — list tasks + status history → `Task`, `TaskTransition`, `ClickUpRawEvent`). **No** scheduled incremental worker, Celery queue, or full retry/QC from plan yet. |
 | **4 — Mapping** | **Partial** | Save workflow mapping (`WorkflowMapping`), onboarding UI scaffolding; enforcement “no analytics until mapped” / auto-suggest from live statuses **still to harden**. |
 | **5 — Normalized storage** | **Partial** | SQLAlchemy models persist tasks, transitions, mappings, snapshots, integrations, invites, intervention logs etc.; Postgres in prod-compose example; SQLite common in dev. |
 | **6 — Metrics engine** | **Partial** | `GET /api/analytics/metrics/{workspace_id}`: median lead/cycle, rework/reopen rates, time-in-status rollup — **narrower than Phase 6 spec** (e.g. idle/throughput). |
 | **7 — Attention v1** | **Partial** | `GET /api/analytics/attention/{workspace_id}`: rule-based score + explanations; **thresholds/rules not fully aligned with Phase 7 spec.** |
-| **8 — Dashboard UI** | **Partial** | Routes: dashboard / attention / impact + workspace settings, members, integrations, onboarding — **no** full bottleneck cards / filters / weekly trend parity yet. |
+| **8 — Dashboard UI** | **Partial** | Routes: **`/dashboard`**, **`/attention`**, **`/impact`**, **`/settings/integrations`**, onboarding; workspace/members UX consolidated under **user settings** (see Phase 1) — **no** full bottleneck cards / filters / weekly trend parity yet. |
 | **9 — Value / Impact** | **Partial** | Impact route + API groundwork; baseline snapshot UX/automation vs Definition of Done **still pending.** |
 | **10 — Pilot ops** | **Not started** | Process — see `docs/PILOT_RUNBOOK.md`. |
 | **8.5 / MVP+ AI** | **Not started** | — |
@@ -135,6 +135,20 @@ Monorepo: `backend/` (FastAPI), `frontend/` (Next.js 14 App Router), `infra/`, `
 Cross-cutting gaps vs DoD MVP: incremental sync + observability, stricter §3.1 i18n (eliminate stray hardcoded copy + missing-key checker), richer dashboard & impact parity, Postgres-backed parity tests where needed.
 
 See also **`PROJECT_OVERVIEW.md` § Implementation wiki.**
+
+### 3.3 Recommended next engineering steps
+
+These steps close the strongest gaps versus §2 and §10 (Definition of Done), in pragmatic order:
+
+1. **Workflow mapping enforcement (Phase 4 hardening)** — Treat “analytics disabled until mapping is confirmed” as a strict product rule in API/UI; finish auto-suggest from live statuses where still stubbed (reduces bogus metrics noise).
+2. **Incremental sync + retries (Phase 3)** — Add a scheduled/backfill worker pattern (even if Cron + single worker before full Celery) so onboarding is not limited to manual historical import; observability baseline (structured logs / last-sync state per workspace).
+3. **Baseline snapshots + Impact parity (§6 notes + Phase 9)** — Automate baseline on first successful import; weekly snapshots; tighten Impact UI vs “before / after” DoD wording.
+4. **Metrics & Attention completeness (Phases 6–7)** — Expand metrics API toward full Lead/Cycle/WIP/threshold coverage; align Attention thresholds with §5 weighting/spec.
+5. **Dashboard UX depth (Phase 8)** — Bottleneck / time-in-status views, filters, weekly trend strips as MVP narrative requires.
+6. **§3.1 i18n quality gate** — Script or CI check for missing `ru` keys; purge remaining stray literals on core routes.
+7. **Pilot readiness (Phase 10)** — When items 1–3 are minimally satisfied, execute `docs/PILOT_RUNBOOK.md`, intervention logging, exit review.
+
+If you must pick **one** next milestone: **`1` + sketch for `2`** (trustworthy normalized analytics + repeatable data freshness) before heavy dashboard polish—otherwise UI work risks churn on wrong numbers.
 
 ## 4) Execution Phases
 

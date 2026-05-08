@@ -52,7 +52,14 @@ main {
   transition: all 0.2s ease;
 }
 
-.btn:hover {
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 8px 24px rgba(59, 130, 246, 0.25);
 }
@@ -432,4 +439,21 @@ main {
   display: grid;
   place-items: center;
   padding: 24px;
+}
+
+@keyframes btn-spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.btnSpinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-inline-end: 8px;
+  animation: btn-spinner-rotate 0.65s linear infinite;
 }

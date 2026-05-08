@@ -50,25 +50,41 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const base = resolveApiBase();
   const url = path.startsWith("http") ? path : `${base}${path}`;
   const res = await fetch(url, { ...init, headers });
+  const raw = await res.text().catch(() => "");
+
   if (!res.ok) {
     let payload: unknown = null;
-    try {
-      payload = await res.json();
-    } catch {
-      payload = await res.text();
+    if (raw.trim()) {
+      try {
+        payload = JSON.parse(raw) as unknown;
+      } catch {
+        payload = raw;
+      }
     }
     if (payload && typeof payload === "object" && "detail" in payload) {
       const detail = (payload as { detail?: unknown }).detail;
       if (typeof detail === "string" && detail.trim().length > 0) {
         throw new Error(detail);
       }
+      if (Array.isArray(detail) && detail.length > 0) {
+        const first = detail[0];
+        if (first && typeof first === "object" && "msg" in first && typeof (first as { msg: unknown }).msg === "string") {
+          throw new Error((first as { msg: string }).msg);
+        }
+      }
     }
     if (typeof payload === "string" && payload.trim().length > 0) {
-      throw new Error(payload);
+      const s = payload.length > 400 ? `${payload.slice(0, 400)}…` : payload;
+      throw new Error(s);
     }
     throw new Error(`HTTP ${res.status}`);
   }
-  if (res.status === 204) return {} as T;
-  return (await res.json()) as T;
+
+  if (res.status === 204 || raw.trim().length === 0) return {} as T;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    throw new Error(`Не удалось разобрать ответ сервера (HTTP ${res.status})`);
+  }
 }
 

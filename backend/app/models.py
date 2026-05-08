@@ -84,13 +84,18 @@ class WorkspaceInvite(Base):
 
 class ClickUpConnection(Base):
     __tablename__ = "clickup_connections"
-    __table_args__ = (UniqueConstraint("workspace_id", name="uq_clickup_workspace"),)
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_id)
     workspace_id: Mapped[str] = mapped_column(String(36), ForeignKey("workspaces.id"), index=True)
+    provider: Mapped[str] = mapped_column(String(32), default="clickup", index=True)
+    name: Mapped[str] = mapped_column(String(255), default="")
+    clickup_user_label: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    setup_status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    clickup_team_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     api_token_encrypted: Mapped[str] = mapped_column(Text)
     selected_scope_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
     selected_scope_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     selected_scope_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -99,6 +104,7 @@ class ClickUpRawEvent(Base):
     __tablename__ = "clickup_raw_events"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_id)
     workspace_id: Mapped[str] = mapped_column(String(36), ForeignKey("workspaces.id"), index=True)
+    connection_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("clickup_connections.id"), index=True, nullable=True)
     event_type: Mapped[str] = mapped_column(String(64))
     payload: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -108,9 +114,10 @@ class Task(Base):
     __tablename__ = "tasks"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_id)
     workspace_id: Mapped[str] = mapped_column(String(36), ForeignKey("workspaces.id"), index=True)
+    connection_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("clickup_connections.id"), index=True, nullable=True)
     source_task_id: Mapped[str] = mapped_column(String(128), index=True)
     title: Mapped[str] = mapped_column(String(1024))
-    task_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    task_type: Mapped[str | None] = mapped_column(Text, nullable=True)
     current_status: Mapped[str | None] = mapped_column(String(255), nullable=True)
     assignee_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at_source: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -124,6 +131,7 @@ class TaskTransition(Base):
     __tablename__ = "task_transitions"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_id)
     workspace_id: Mapped[str] = mapped_column(String(36), ForeignKey("workspaces.id"), index=True)
+    connection_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("clickup_connections.id"), index=True, nullable=True)
     task_source_id: Mapped[str] = mapped_column(String(128), index=True)
     from_status: Mapped[str | None] = mapped_column(String(255), nullable=True)
     to_status: Mapped[str] = mapped_column(String(255))
@@ -134,6 +142,7 @@ class WorkflowMapping(Base):
     __tablename__ = "workflow_mappings"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_id)
     workspace_id: Mapped[str] = mapped_column(String(36), ForeignKey("workspaces.id"), index=True)
+    connection_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("clickup_connections.id"), index=True, nullable=True)
     source_status: Mapped[str] = mapped_column(String(255))
     normalized_status: Mapped[str] = mapped_column(String(64))
     scope_type: Mapped[str] = mapped_column(String(32), default="list")

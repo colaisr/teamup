@@ -13,11 +13,27 @@ from app.utils import get_workspace_membership
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 
 
-def _active_mapping(db: Session, workspace_id: str) -> dict[str, str]:
+def _active_mapping_by_connection(db: Session, workspace_id: str) -> dict[str, dict[str, str]]:
     rows = db.query(WorkflowMapping).filter(
         WorkflowMapping.workspace_id == workspace_id, WorkflowMapping.is_active.is_(True)
     )
-    return {r.source_status: r.normalized_status for r in rows}
+    out: dict[str, dict[str, str]] = {}
+    for r in rows:
+        key = r.connection_id or "__legacy__"
+        bucket = out.setdefault(key, {})
+        bucket[r.source_status] = r.normalized_status
+    return out
+
+
+def _norm(mapping_by_connection: dict[str, dict[str, str]], connection_id: str | None, raw_status: str | None) -> str | None:
+    if raw_status is None:
+        return None
+    ckey = connection_id or "__legacy__"
+    scoped = mapping_by_connection.get(ckey, {})
+    if raw_status in scoped:
+        return scoped[raw_status]
+    legacy = mapping_by_connection.get("__legacy__", {})
+    return legacy.get(raw_status, raw_status)
 
 
 def _hours(delta: timedelta | None) -> float:
@@ -33,13 +49,13 @@ def compute_metrics(
     current_user: User = Depends(get_current_user),
 ):
     get_workspace_membership(db, workspace_id, current_user.id)
-    mapping = _active_mapping(db, workspace_id)
+    mapping = _active_mapping_by_connection(db, workspace_id)
     tasks = db.query(Task).filter(Task.workspace_id == workspace_id).all()
     transitions = db.query(TaskTransition).filter(TaskTransition.workspace_id == workspace_id).all()
 
-    by_task: dict[str, list[TaskTransition]] = defaultdict(list)
+    by_task: dict[tuple[str, str], list[TaskTransition]] = defaultdict(list)
     for t in transitions:
-        by_task[t.task_source_id].append(t)
+        by_task[(t.connection_id or "", t.task_source_id)].append(t)
     for k in by_task:
         by_task[k] = sorted(by_task[k], key=lambda x: x.transitioned_at)
 
@@ -50,16 +66,17 @@ def compute_metrics(
     status_hours: dict[str, float] = defaultdict(float)
 
     for task in tasks:
-        history = by_task.get(task.source_task_id, [])
+        tkey = (task.connection_id or "", task.source_task_id)
+        history = by_task.get(tkey, [])
         first_active = None
         done_at = task.completed_at_source
         prev = None
         for tr in history:
-            norm = mapping.get(tr.to_status, tr.to_status)
+            norm = _norm(mapping, task.connection_id, tr.to_status)
             if not first_active and norm == "In Progress":
                 first_active = tr.transitioned_at
             if prev:
-                prev_norm = mapping.get(prev.to_status, prev.to_status)
+                prev_norm = _norm(mapping, task.connection_id, prev.to_status)
                 span = tr.transitioned_at - prev.transitioned_at
                 status_hours[prev_norm] += _hours(span)
                 if prev_norm in {"QA", "Review", "Done"} and norm == "In Progress":
@@ -99,20 +116,21 @@ def attention_tasks(
     current_user: User = Depends(get_current_user),
 ):
     get_workspace_membership(db, workspace_id, current_user.id)
-    mapping = _active_mapping(db, workspace_id)
+    mapping = _active_mapping_by_connection(db, workspace_id)
     tasks = db.query(Task).filter(Task.workspace_id == workspace_id).all()
     transitions = db.query(TaskTransition).filter(TaskTransition.workspace_id == workspace_id).all()
 
-    by_task: dict[str, list[TaskTransition]] = defaultdict(list)
+    by_task: dict[tuple[str, str], list[TaskTransition]] = defaultdict(list)
     for tr in transitions:
-        by_task[tr.task_source_id].append(tr)
+        by_task[(tr.connection_id or "", tr.task_source_id)].append(tr)
     for key in by_task:
         by_task[key] = sorted(by_task[key], key=lambda t: t.transitioned_at)
 
     now = datetime.utcnow()
     out: list[AttentionTaskOut] = []
     for task in tasks:
-        history = by_task.get(task.source_task_id, [])
+        tkey = (task.connection_id or "", task.source_task_id)
+        history = by_task.get(tkey, [])
         reasons: list[str] = []
         score = 0.0
         action = "Проверьте блокеры и уточните следующий шаг."
@@ -126,15 +144,15 @@ def attention_tasks(
             reasons.append("Нет обновлений более 2 дней")
         loop_count = 0
         for i in range(1, len(history)):
-            prev = mapping.get(history[i - 1].to_status, history[i - 1].to_status)
-            cur = mapping.get(history[i].to_status, history[i].to_status)
+            prev = _norm(mapping, task.connection_id, history[i - 1].to_status)
+            cur = _norm(mapping, task.connection_id, history[i].to_status)
             if prev in {"QA", "Review", "Done"} and cur == "In Progress":
                 loop_count += 1
         if loop_count > 0:
             score += min(0.25, loop_count * 0.08)
             reasons.append(f"Возвраты в работу: {loop_count}")
             action = "Проведите быстрый разбор причин возвратов."
-        if task.current_status and mapping.get(task.current_status, task.current_status) in {"QA", "Review"}:
+        if task.current_status and _norm(mapping, task.connection_id, task.current_status) in {"QA", "Review"}:
             latest = history[-1].transitioned_at if history else task.updated_at_source
             if latest and (now - latest).days >= 2:
                 score += 0.4

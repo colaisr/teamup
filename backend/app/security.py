@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -42,11 +43,12 @@ def create_random_token() -> str:
 
 
 def _fernet() -> Fernet:
-    if settings.encryption_key_base64:
-        key = settings.encryption_key_base64.encode("utf-8")
+    if settings.encryption_key_base64 and settings.encryption_key_base64.strip():
+        key = settings.encryption_key_base64.strip().encode("utf-8")
     else:
-        # Development fallback so app can boot without secrets.
-        key = base64.urlsafe_b64encode(b"teamup-dev-secret-key-teamup-dev-")
+        # Fernet requires url-safe base64 of exactly 32 bytes; hash fixes dev key shape.
+        raw32 = hashlib.sha256(b"teamup-dev-clickup-token-encryption").digest()
+        key = base64.urlsafe_b64encode(raw32)
     return Fernet(key)
 
 
