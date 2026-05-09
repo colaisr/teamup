@@ -197,22 +197,66 @@ def _insert_transition_if_missing(
 
 
 def _task_type_snapshot_from_clickup(task_payload: dict) -> str | None:
-    """First custom field value; can be large JSON from ClickUp → store as text."""
+    """Best-effort human label from custom fields; skip raw JSON/noisy values."""
     fields = task_payload.get("custom_fields")
     if not fields or not isinstance(fields, list):
         return None
-    first = fields[0]
-    if not isinstance(first, dict):
-        return None
-    v = first.get("value")
-    if v is None:
-        return None
-    if isinstance(v, (dict, list)):
-        try:
-            return json.dumps(v, ensure_ascii=False)
-        except (TypeError, ValueError):
-            return str(v)
-    return str(v)
+    for field in fields:
+        if not isinstance(field, dict):
+            continue
+        value = field.get("value")
+        if value in (None, "", []):
+            continue
+
+        type_name = str(field.get("type") or "").lower()
+        if type_name in {"date", "manual_progress", "automatic_progress", "emoji", "number", "currency"}:
+            continue
+
+        options = []
+        type_config = field.get("type_config")
+        if isinstance(type_config, dict):
+            maybe_options = type_config.get("options")
+            if isinstance(maybe_options, list):
+                options = [opt for opt in maybe_options if isinstance(opt, dict)]
+
+        option_name_by_id = {
+            str(opt.get("id")): str(opt.get("name")).strip()
+            for opt in options
+            if opt.get("id") is not None and isinstance(opt.get("name"), str) and str(opt.get("name")).strip()
+        }
+
+        if isinstance(value, str):
+            text = value.strip()
+            if not text:
+                continue
+            if text in option_name_by_id:
+                return option_name_by_id[text][:120]
+            if len(text) <= 120 and not (text.startswith("{") or text.startswith("[")):
+                return text
+            continue
+
+        if isinstance(value, list):
+            labels = [option_name_by_id.get(str(v)) for v in value if option_name_by_id.get(str(v))]
+            clean = [label for label in labels if label]
+            if clean:
+                return ", ".join(clean[:3])[:120]
+            continue
+
+        if isinstance(value, dict):
+            nested = value.get("value")
+            if isinstance(nested, str) and nested.strip():
+                text = nested.strip()
+                if text in option_name_by_id:
+                    return option_name_by_id[text][:120]
+                if len(text) <= 120 and not (text.startswith("{") or text.startswith("[")):
+                    return text
+            continue
+
+        # Avoid grouping by raw numeric or bool custom values.
+        if isinstance(value, (int, float, bool)):
+            continue
+
+    return None
 
 
 def _label_from_clickup_me(me: dict) -> str | None:

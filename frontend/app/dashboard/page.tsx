@@ -11,9 +11,47 @@ import { useActiveWorkspaceId } from "@/lib/workspace";
 type Metrics = {
   median_lead_time_hours: number;
   median_cycle_time_hours: number;
+  median_idle_time_hours: number;
+  median_flow_efficiency_pct: number;
   rework_rate: number;
   reopen_rate: number;
+  loop_count_total: number;
+  time_in_status_hours: Record<string, number>;
   task_count: number;
+  aggregations: {
+    by_task_type: Record<
+      string,
+      {
+        median_lead_time_hours: number;
+        median_cycle_time_hours: number;
+        median_idle_time_hours: number;
+        median_flow_efficiency_pct: number;
+        completed_for_cycle_count: number;
+        flow_efficiency_sample_count: number;
+        rework_rate: number;
+        reopen_rate: number;
+        loop_count_total: number;
+        task_count: number;
+      }
+    >;
+    by_period: {
+      bucket: string;
+      items: Array<{
+        period: string;
+        created_tasks: number;
+        completed_tasks: number;
+        median_lead_time_hours: number;
+        median_cycle_time_hours: number;
+        median_idle_time_hours: number;
+        median_flow_efficiency_pct: number;
+        completed_for_cycle_count: number;
+        flow_efficiency_sample_count: number;
+        rework_rate: number;
+        reopen_rate: number;
+        loop_count_total: number;
+      }>;
+    };
+  };
 };
 
 export default function DashboardPage() {
@@ -58,6 +96,20 @@ export default function DashboardPage() {
     return `${(value * 100).toFixed(1)}%`;
   }
 
+  function formatFlow(value: number): string {
+    return `${value.toFixed(1)}%`;
+  }
+
+  function formatHoursSafe(value: number, sampleCount?: number): string {
+    if (typeof sampleCount === "number" && sampleCount <= 0) return t("dashboard.noMetricData");
+    return formatHours(value);
+  }
+
+  function formatFlowSafe(value: number, sampleCount?: number): string {
+    if (typeof sampleCount === "number" && sampleCount <= 0) return t("dashboard.noMetricData");
+    return formatFlow(value);
+  }
+
   function flowRiskLead(value: number): "low" | "medium" | "high" {
     if (value >= 120) return "high";
     if (value >= 72) return "medium";
@@ -90,6 +142,28 @@ export default function DashboardPage() {
     if (reopenRisk !== "low") signals.push(t("dashboard.signal.reopenRisk"));
     return signals;
   }, [metrics, leadRisk, cycleRisk, reworkRisk, reopenRisk]);
+  const topStatusBottlenecks = useMemo(() => {
+    if (!metrics) return [];
+    const total = Object.values(metrics.time_in_status_hours || {}).reduce((sum, value) => sum + value, 0);
+    return Object.entries(metrics.time_in_status_hours || {})
+      .map(([status, hours]) => ({
+        status,
+        hours,
+        share: total > 0 ? (hours / total) * 100 : 0
+      }))
+      .sort((a, b) => b.hours - a.hours)
+      .slice(0, 6);
+  }, [metrics]);
+  const taskTypeRows = useMemo(() => {
+    if (!metrics) return [];
+    return Object.entries(metrics.aggregations?.by_task_type || {})
+      .map(([taskType, data]) => ({ taskType, ...data }))
+      .sort((a, b) => b.task_count - a.task_count);
+  }, [metrics]);
+  const weeklyRows = useMemo(() => {
+    if (!metrics) return [];
+    return [...(metrics.aggregations?.by_period?.items || [])].slice(-8);
+  }, [metrics]);
 
   return (
     <div className="grid">
@@ -153,6 +227,24 @@ export default function DashboardPage() {
               </span>
               <strong style={{ fontSize: 22 }}>{metrics.task_count}</strong>
             </div>
+            <div className="card" style={{ padding: 12, display: "grid", gap: 4, background: "var(--panel-soft)", border: "1px solid var(--border)" }}>
+              <span className="muted" style={{ fontSize: 12 }}>
+                {t("dashboard.metric.idleTime")}
+              </span>
+              <strong style={{ fontSize: 22 }}>{formatHours(metrics.median_idle_time_hours)}</strong>
+            </div>
+            <div className="card" style={{ padding: 12, display: "grid", gap: 4, background: "var(--panel-soft)", border: "1px solid var(--border)" }}>
+              <span className="muted" style={{ fontSize: 12 }}>
+                {t("dashboard.metric.flowEfficiency")}
+              </span>
+              <strong style={{ fontSize: 22 }}>{formatFlow(metrics.median_flow_efficiency_pct)}</strong>
+            </div>
+            <div className="card" style={{ padding: 12, display: "grid", gap: 4, background: "var(--panel-soft)", border: "1px solid var(--border)" }}>
+              <span className="muted" style={{ fontSize: 12 }}>
+                {t("dashboard.metric.loops")}
+              </span>
+              <strong style={{ fontSize: 22 }}>{metrics.loop_count_total}</strong>
+            </div>
           </div>
 
           <div className="card" style={{ display: "grid", gap: 12 }}>
@@ -208,6 +300,114 @@ export default function DashboardPage() {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 10 }}>
+            <div className="card" style={{ display: "grid", gap: 8 }}>
+              <strong>{t("dashboard.bottleneckTitle")}</strong>
+              {topStatusBottlenecks.length === 0 ? (
+                <p className="muted" style={{ margin: 0 }}>
+                  {t("dashboard.bottleneckEmpty")}
+                </p>
+              ) : (
+                <div style={{ display: "grid", gap: 6 }}>
+                  {topStatusBottlenecks.map((item) => (
+                    <div
+                      key={item.status}
+                      style={{
+                        borderRadius: 8,
+                        border: "1px solid var(--border)",
+                        background: "var(--panel-soft)",
+                        padding: "8px 10px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 10,
+                        alignItems: "center"
+                      }}
+                    >
+                      <div style={{ overflowWrap: "anywhere" }}>{item.status}</div>
+                      <div className="muted" style={{ fontSize: 12, whiteSpace: "nowrap" }}>
+                        {item.hours.toFixed(1)} {t("dashboard.unit.hours")} · {item.share.toFixed(1)}%
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="card" style={{ display: "grid", gap: 8 }}>
+              <strong>{t("dashboard.taskTypeTitle")}</strong>
+              {taskTypeRows.length === 0 ? (
+                <p className="muted" style={{ margin: 0 }}>
+                  {t("dashboard.taskTypeEmpty")}
+                </p>
+              ) : (
+                <div style={{ display: "grid", gap: 6 }}>
+                  {taskTypeRows.slice(0, 6).map((row) => (
+                    <div
+                      key={row.taskType}
+                      style={{
+                        borderRadius: 8,
+                        border: "1px solid var(--border)",
+                        background: "var(--panel-soft)",
+                        padding: "8px 10px",
+                        display: "grid",
+                        gap: 4
+                      }}
+                    >
+                      <strong style={{ fontSize: 13 }}>{row.taskType === "unknown" ? t("dashboard.taskType.unknown") : row.taskType}</strong>
+                      <div className="muted" style={{ fontSize: 12 }}>
+                        {t("dashboard.metric.tasks")}: {row.task_count} · {t("dashboard.metric.cycleTime")}:{" "}
+                        {formatHoursSafe(row.median_cycle_time_hours, row.completed_for_cycle_count)}
+                      </div>
+                      <div className="muted" style={{ fontSize: 12 }}>
+                        {t("dashboard.metric.flowEfficiency")}:{" "}
+                        {formatFlowSafe(row.median_flow_efficiency_pct, row.flow_efficiency_sample_count)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="card" style={{ display: "grid", gap: 8 }}>
+            <strong>{t("dashboard.weeklyTitle")}</strong>
+            {weeklyRows.length === 0 ? (
+              <p className="muted" style={{ margin: 0 }}>
+                {t("dashboard.weeklyEmpty")}
+              </p>
+            ) : (
+              <div style={{ display: "grid", gap: 6 }}>
+                {weeklyRows.map((row) => (
+                  <div
+                    key={row.period}
+                    style={{
+                      borderRadius: 8,
+                      border: "1px solid var(--border)",
+                      background: "var(--panel-soft)",
+                      padding: "8px 10px",
+                      display: "grid",
+                      gap: 4
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                      <strong style={{ fontSize: 13 }}>{row.period}</strong>
+                      <span className="muted" style={{ fontSize: 12 }}>
+                        {t("dashboard.weekly.created")}: {row.created_tasks} · {t("dashboard.weekly.completed")}: {row.completed_tasks}
+                      </span>
+                    </div>
+                    <div className="muted" style={{ fontSize: 12 }}>
+                      {t("dashboard.metric.leadTime")}: {formatHoursSafe(row.median_lead_time_hours, row.completed_for_cycle_count)} ·{" "}
+                      {t("dashboard.metric.cycleTime")}: {formatHoursSafe(row.median_cycle_time_hours, row.completed_for_cycle_count)}
+                    </div>
+                    <div className="muted" style={{ fontSize: 12 }}>
+                      {t("dashboard.metric.reworkRate")}: {formatPercent(row.rework_rate)} · {t("dashboard.metric.reopenRate")}: {formatPercent(row.reopen_rate)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </>
       ) : null}

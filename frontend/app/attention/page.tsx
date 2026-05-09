@@ -16,6 +16,18 @@ type AttentionTask = {
   title: string;
   current_status: string | null;
   attention_score: number;
+  severity?: "low" | "medium" | "high";
+  loop_count?: number;
+  signals?: Array<{
+    code: string;
+    severity: "low" | "medium" | "high";
+    score: number;
+    message: string;
+    threshold_hours?: number;
+    observed_hours?: number;
+    threshold_count?: number;
+    observed_count?: number;
+  }>;
   reasons: string[];
   suggested_action: string;
 };
@@ -31,6 +43,7 @@ export default function AttentionPage() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [scoreFilter, setScoreFilter] = useState<"all" | "critical" | "elevated">("all");
+  const [severityFilter, setSeverityFilter] = useState<"all" | "high" | "medium" | "low">("all");
   const [sortBy, setSortBy] = useState<"score" | "status" | "title">("score");
 
   const load = useCallback(async () => {
@@ -94,6 +107,7 @@ export default function AttentionPage() {
       if (statusFilter !== "all" && (item.current_status || "") !== statusFilter) return false;
       if (scoreFilter === "critical" && item.attention_score < 0.75) return false;
       if (scoreFilter === "elevated" && (item.attention_score <= 0 || item.attention_score >= 0.75)) return false;
+      if (severityFilter !== "all" && (item.severity || "low") !== severityFilter) return false;
       return true;
     });
 
@@ -103,7 +117,7 @@ export default function AttentionPage() {
       return a.title.localeCompare(b.title);
     });
     return rows;
-  }, [items, query, statusFilter, scoreFilter, sortBy]);
+  }, [items, query, statusFilter, scoreFilter, severityFilter, sortBy]);
 
   const summary = useMemo(
     () => ({
@@ -196,6 +210,12 @@ export default function AttentionPage() {
               <option value="critical">{t("attention.filter.score.critical")}</option>
               <option value="elevated">{t("attention.filter.score.elevated")}</option>
             </select>
+            <select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value as "all" | "high" | "medium" | "low")}>
+              <option value="all">{t("attention.filter.severity.all")}</option>
+              <option value="high">{t("attention.filter.severity.high")}</option>
+              <option value="medium">{t("attention.filter.severity.medium")}</option>
+              <option value="low">{t("attention.filter.severity.low")}</option>
+            </select>
             <select value={sortBy} onChange={(e) => setSortBy(e.target.value as "score" | "status" | "title")}>
               <option value="score">{t("attention.sort.score")}</option>
               <option value="status">{t("attention.sort.status")}</option>
@@ -241,6 +261,42 @@ export default function AttentionPage() {
               >
                 {t("attention.label.score")}: {item.attention_score}
               </span>
+            </div>
+
+            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+              <span
+                style={{
+                  borderRadius: 999,
+                  border:
+                    item.severity === "high"
+                      ? "1px solid var(--tone-danger-border)"
+                      : item.severity === "medium"
+                        ? "1px solid var(--tone-warning-border)"
+                        : "1px solid var(--tone-success-border)",
+                  background:
+                    item.severity === "high"
+                      ? "var(--tone-danger-bg)"
+                      : item.severity === "medium"
+                        ? "var(--tone-warning-bg)"
+                        : "var(--tone-success-bg)",
+                  color:
+                    item.severity === "high"
+                      ? "var(--tone-danger-text)"
+                      : item.severity === "medium"
+                        ? "var(--tone-warning-text)"
+                        : "var(--tone-success-text)",
+                  fontSize: 12,
+                  padding: "2px 8px",
+                  fontWeight: 700
+                }}
+              >
+                {t(`attention.severity.${item.severity || "low"}`)}
+              </span>
+              {typeof item.loop_count === "number" ? (
+                <span className="muted" style={{ fontSize: 12 }}>
+                  {t("attention.loopCount")}: {item.loop_count}
+                </span>
+              ) : null}
             </div>
 
             <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))" }}>
@@ -291,6 +347,46 @@ export default function AttentionPage() {
               </div>
               <div style={{ fontSize: 14 }}>{item.suggested_action || "—"}</div>
             </div>
+
+            {item.signals && item.signals.length > 0 ? (
+              <div style={{ display: "grid", gap: 6 }}>
+                <div className="muted" style={{ fontSize: 11 }}>
+                  {t("attention.signalsTitle")}
+                </div>
+                <div style={{ display: "grid", gap: 6 }}>
+                  {item.signals.slice(0, 3).map((signal, idx) => (
+                    <div
+                      key={`${item.source_task_id}-signal-${idx}`}
+                      style={{
+                        borderRadius: 8,
+                        border:
+                          signal.severity === "high"
+                            ? "1px solid var(--tone-danger-border)"
+                            : signal.severity === "medium"
+                              ? "1px solid var(--tone-warning-border)"
+                              : "1px solid var(--tone-neutral-border)",
+                        background:
+                          signal.severity === "high"
+                            ? "var(--tone-danger-bg)"
+                            : signal.severity === "medium"
+                              ? "var(--tone-warning-bg)"
+                              : "var(--tone-neutral-bg)",
+                        color:
+                          signal.severity === "high"
+                            ? "var(--tone-danger-text)"
+                            : signal.severity === "medium"
+                              ? "var(--tone-warning-text)"
+                              : "var(--tone-neutral-text)",
+                        padding: "7px 10px",
+                        fontSize: 12
+                      }}
+                    >
+                      {signal.message}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
             <AiActionButton busy={aiBusyTaskId === item.source_task_id} onClick={() => void explainTask(item.source_task_id)}>
               {t("tasks.explainWithAi")}

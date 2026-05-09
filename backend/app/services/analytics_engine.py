@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import datetime, timedelta
+import json
 import math
 
 from sqlalchemy.orm import Session
@@ -81,7 +82,56 @@ def _group_transitions_by_task(transitions: list[TaskTransition]) -> dict[tuple[
 
 
 def _task_type_key(task: Task) -> str:
-    return (task.task_type or "unknown").strip() or "unknown"
+    raw = (task.task_type or "").strip()
+    if not raw:
+        return "unknown"
+    lower = raw.lower()
+    if lower in {"none", "null", "undefined", "nan"}:
+        return "unknown"
+
+    parsed: object | None = None
+    if raw.startswith("{") or raw.startswith("["):
+        try:
+            parsed = json.loads(raw)
+        except (TypeError, ValueError):
+            parsed = None
+
+    def _extract(obj: object) -> str | None:
+        if isinstance(obj, str):
+            text = obj.strip()
+            if text and len(text) <= 120:
+                return text
+            return None
+        if isinstance(obj, list):
+            labels = [_extract(item) for item in obj]
+            clean = [label for label in labels if label]
+            if clean:
+                return ", ".join(clean[:3])
+            return None
+        if isinstance(obj, dict):
+            for key in ("name", "label", "title"):
+                val = obj.get(key)
+                if isinstance(val, str) and val.strip():
+                    return val.strip()[:120]
+            if "value" in obj:
+                val = obj.get("value")
+                if isinstance(val, str) and val.strip():
+                    return val.strip()[:120]
+                if isinstance(val, (int, float, bool)):
+                    return None
+            if len(obj) == 1:
+                return _extract(next(iter(obj.values())))
+        return None
+
+    extracted = _extract(parsed) if parsed is not None else None
+    if extracted:
+        return extracted
+
+    if raw.startswith("{") or raw.startswith("["):
+        return "unknown"
+    if raw.isdigit() and len(raw) >= 8:
+        return "unknown"
+    return raw[:120]
 
 
 def _week_bucket(ts: datetime | None) -> str:
@@ -225,6 +275,8 @@ def _summarize_population(stats: list[dict]) -> dict:
         "median_cycle_time_hours": _median(cycle_values),
         "median_idle_time_hours": _median(idle_values),
         "median_flow_efficiency_pct": _median(flow_values),
+        "completed_for_cycle_count": len(cycle_values),
+        "flow_efficiency_sample_count": len(flow_values),
         "rework_rate": round(rework_count / denominator, 4),
         "reopen_rate": round(reopen_count / denominator, 4),
         "loop_count_total": rework_count,
@@ -279,6 +331,8 @@ def compute_metrics_payload(db: Session, workspace_id: str) -> dict:
                 "median_cycle_time_hours": summary["median_cycle_time_hours"],
                 "median_idle_time_hours": summary["median_idle_time_hours"],
                 "median_flow_efficiency_pct": summary["median_flow_efficiency_pct"],
+                "completed_for_cycle_count": summary["completed_for_cycle_count"],
+                "flow_efficiency_sample_count": summary["flow_efficiency_sample_count"],
                 "rework_rate": summary["rework_rate"],
                 "reopen_rate": summary["reopen_rate"],
                 "loop_count_total": summary["loop_count_total"],
@@ -291,6 +345,8 @@ def compute_metrics_payload(db: Session, workspace_id: str) -> dict:
         "median_cycle_time_hours": top["median_cycle_time_hours"],
         "median_idle_time_hours": top["median_idle_time_hours"],
         "median_flow_efficiency_pct": top["median_flow_efficiency_pct"],
+        "completed_for_cycle_count": top["completed_for_cycle_count"],
+        "flow_efficiency_sample_count": top["flow_efficiency_sample_count"],
         "rework_rate": top["rework_rate"],
         "reopen_rate": top["reopen_rate"],
         "loop_count_total": top["loop_count_total"],
