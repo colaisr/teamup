@@ -64,6 +64,12 @@ function directionColor(direction: ImpactRow["direction"]): string {
   return "#94a3b8";
 }
 
+function rowTint(direction: ImpactRow["direction"]): string {
+  if (direction === "improved") return "rgba(74, 222, 128, 0.07)";
+  if (direction === "worsened") return "rgba(251, 113, 133, 0.07)";
+  return "transparent";
+}
+
 export default function ImpactPage() {
   const [workspaceId, setWorkspaceId] = useActiveWorkspaceId("");
   const [rows, setRows] = useState<ImpactRow[]>([]);
@@ -119,6 +125,13 @@ export default function ImpactPage() {
     return type;
   }
 
+  function narrativeLine(): string {
+    const i = commentary.improved.length;
+    const w = commentary.worsened.length;
+    if (i === 0 && w === 0) return t("impact.narrativeSteady");
+    return t("impact.narrativeMixed").replace("{i}", String(i)).replace("{w}", String(w));
+  }
+
   return (
     <div className="grid">
       <h1>{t("impact.title")}</h1>
@@ -128,15 +141,15 @@ export default function ImpactPage() {
         </p>
         <input value={workspaceId} onChange={(e) => setWorkspaceId(e.target.value)} placeholder={t("tasks.workspacePlaceholder")} />
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button className="btn" style={{ marginLeft: 8 }} onClick={() => saveSnapshot("baseline")}>
-          {t("impact.saveBaseline")}
-        </button>
-        <button className="btn" style={{ marginLeft: 8 }} onClick={() => saveSnapshot("current")}>
-          {t("impact.saveCurrent")}
-        </button>
-        <button className="btn" style={{ marginLeft: 8 }} onClick={load}>
-          {t("impact.compare")}
-        </button>
+          <button className="btn" onClick={() => saveSnapshot("baseline")}>
+            {t("impact.saveBaseline")}
+          </button>
+          <button className="btn" onClick={() => saveSnapshot("current")}>
+            {t("impact.saveCurrent")}
+          </button>
+          <button className="btn" onClick={load}>
+            {t("impact.compare")}
+          </button>
         </div>
       </div>
       {!hasBaseline && rows.length > 0 ? (
@@ -144,19 +157,56 @@ export default function ImpactPage() {
           {t("impact.noBaseline")}
         </p>
       ) : null}
-      {hasBaseline && rows.length > 0 ? (
-        <div className="card" style={{ display: "grid", gap: 8 }}>
-          <strong>{t("impact.commentaryTitle")}</strong>
-          <p className="muted" style={{ margin: 0 }}>
-            {commentary.improved.length > 0
-              ? `${t("impact.improved")}: ${commentary.improved.map(metricLabel).join(", ")}`
-              : t("impact.noImproved")}
-          </p>
-          <p className="muted" style={{ margin: 0 }}>
-            {commentary.worsened.length > 0
-              ? `${t("impact.worsened")}: ${commentary.worsened.map(metricLabel).join(", ")}`
-              : t("impact.noWorsened")}
-          </p>
+      {rows.length > 0 ? (
+        <div className="card" style={{ display: "grid", gap: 16 }}>
+          <div>
+            <strong style={{ fontSize: "1.05rem" }}>{t("impact.pilotTitle")}</strong>
+            <p className="muted" style={{ margin: "8px 0 0", lineHeight: 1.5 }}>
+              {t("impact.pilotIntro")}
+            </p>
+            <p style={{ margin: "14px 0 6px", fontWeight: 700 }}>{t("impact.narrativeHeadline")}</p>
+            <p className="muted" style={{ margin: 0, lineHeight: 1.5 }}>
+              {narrativeLine()}
+            </p>
+          </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 12,
+            }}
+          >
+            <div
+              style={{
+                borderLeft: "3px solid #4ade80",
+                padding: "10px 12px",
+                borderRadius: 8,
+                background: "rgba(74, 222, 128, 0.06)",
+              }}
+            >
+              <strong>{t("impact.improved")}</strong>
+              <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.92rem", lineHeight: 1.45 }}>
+                {commentary.improved.length > 0
+                  ? commentary.improved.map(metricLabel).join(", ")
+                  : t("impact.noImproved")}
+              </p>
+            </div>
+            <div
+              style={{
+                borderLeft: "3px solid #fb7185",
+                padding: "10px 12px",
+                borderRadius: 8,
+                background: "rgba(251, 113, 133, 0.06)",
+              }}
+            >
+              <strong>{t("impact.worsened")}</strong>
+              <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.92rem", lineHeight: 1.45 }}>
+                {commentary.worsened.length > 0
+                  ? commentary.worsened.map(metricLabel).join(", ")
+                  : t("impact.noWorsened")}
+              </p>
+            </div>
+          </div>
         </div>
       ) : null}
       {workspaceId && historySynced && historyRows.length > 0 ? (
@@ -167,20 +217,45 @@ export default function ImpactPage() {
           formatValue={formatMetricValue}
         />
       ) : null}
-      {rows.map((row) => (
-        <div key={row.metric} className="card">
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
-            <strong>{metricLabel(row.metric)}</strong>
-            <span style={{ color: directionColor(row.direction), fontWeight: 700 }}>
-              {t(`impact.direction.${row.direction}`)}
-            </span>
+      {rows.length > 0 ? (
+        <div className="card" style={{ display: "grid", gap: 12 }}>
+          <strong>{t("impact.compareTableTitle")}</strong>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.92rem" }}>
+              <thead>
+                <tr style={{ textAlign: "left", borderBottom: "1px solid rgba(148,163,184,0.35)" }}>
+                  <th style={{ padding: "8px 10px" }}>{t("impact.col.metric")}</th>
+                  <th style={{ padding: "8px 10px" }}>{t("impact.col.direction")}</th>
+                  <th style={{ padding: "8px 10px" }}>{t("impact.baseline")}</th>
+                  <th style={{ padding: "8px 10px" }}>{t("impact.current")}</th>
+                  <th style={{ padding: "8px 10px" }}>{t("impact.delta")}</th>
+                  <th style={{ padding: "8px 10px" }}>{t("impact.deltaPct")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr
+                    key={row.metric}
+                    style={{
+                      borderBottom: "1px solid rgba(148,163,184,0.15)",
+                      background: rowTint(row.direction),
+                    }}
+                  >
+                    <td style={{ padding: "8px 10px", fontWeight: 600 }}>{metricLabel(row.metric)}</td>
+                    <td style={{ padding: "8px 10px", color: directionColor(row.direction), fontWeight: 700 }}>
+                      {t(`impact.direction.${row.direction}`)}
+                    </td>
+                    <td style={{ padding: "8px 10px" }}>{formatMetricValue(row.metric, row.baseline)}</td>
+                    <td style={{ padding: "8px 10px" }}>{formatMetricValue(row.metric, row.current)}</td>
+                    <td style={{ padding: "8px 10px" }}>{formatMetricValue(row.metric, row.delta)}</td>
+                    <td style={{ padding: "8px 10px" }}>{row.delta_pct === null ? "—" : `${row.delta_pct}%`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <p>{t("impact.baseline")}: {formatMetricValue(row.metric, row.baseline)}</p>
-          <p>{t("impact.current")}: {formatMetricValue(row.metric, row.current)}</p>
-          <p>{t("impact.delta")}: {formatMetricValue(row.metric, row.delta)}</p>
-          <p>{t("impact.deltaPct")}: {row.delta_pct === null ? "—" : `${row.delta_pct}%`}</p>
         </div>
-      ))}
+      ) : null}
       {workspaceId && historySynced ? (
         <div className="card" style={{ display: "grid", gap: 10 }}>
           <strong>{t("impact.historyTitle")}</strong>
@@ -204,7 +279,10 @@ export default function ImpactPage() {
                 </thead>
                 <tbody>
                   {historyRows.map((snap, idx) => (
-                    <tr key={`${snap.created_at ?? ""}-${snap.snapshot_type}-${idx}`} style={{ borderBottom: "1px solid rgba(148,163,184,0.2)" }}>
+                    <tr
+                      key={`${snap.created_at ?? ""}-${snap.snapshot_type}-${idx}`}
+                      style={{ borderBottom: "1px solid rgba(148,163,184,0.2)" }}
+                    >
                       <td style={{ padding: "6px 8px" }}>
                         {snap.created_at ? new Date(snap.created_at).toLocaleString() : "—"}
                       </td>

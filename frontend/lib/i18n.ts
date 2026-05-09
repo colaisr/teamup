@@ -147,6 +147,17 @@ const ru: Dict = {
     "По горизонтали: от более раннего снимка к более позднему. Линия соединяет значения метрики при каждом сохранении.",
   "impact.trendsHintShort": "Пока один снимок — показана точка. Сохраняйте снимки чаще, чтобы увидеть линию тренда.",
   "impact.trendsScale": "Диапазон на графике",
+  "impact.pilotTitle": "Для пилота",
+  "impact.pilotIntro":
+    "Страница показывает, сдвинулись ли ключевые метрики относительно сохранённого baseline. Удобно для ретро: что улучшилось, что ухудшилось, куда смотреть дальше.",
+  "impact.narrativeHeadline": "Краткий итог",
+  "impact.narrativeSteady":
+    "Относительно baseline заметных сдвигов «лучше / хуже» по правилам сравнения пока нет — продолжайте синхронизировать данные и при необходимости обновляйте снимки.",
+  "impact.narrativeMixed":
+    "По сравнению с baseline: улучшилось метрик — {i}, ухудшилось — {w}. Подробности — в таблице ниже.",
+  "impact.compareTableTitle": "Сводная таблица: baseline и текущие значения",
+  "impact.col.metric": "Показатель",
+  "impact.col.direction": "Тренд",
   "settings.workspace.title": "Настройки рабочего пространства",
   "settings.members.title": "Участники и приглашения",
   "settings.integrations.title": "Интеграции",
@@ -457,6 +468,17 @@ const en: Dict = {
     "Horizontal axis runs from the earliest saved snapshot to the latest. The line connects the metric at each save.",
   "impact.trendsHintShort": "Only one snapshot so far — shown as a dot. Save more snapshots to see a trend line.",
   "impact.trendsScale": "Chart range",
+  "impact.pilotTitle": "For your pilot",
+  "impact.pilotIntro":
+    "This view shows whether key metrics moved versus your saved baseline. Use it in retrospectives: what improved, what worsened, and where to focus next.",
+  "impact.narrativeHeadline": "Summary",
+  "impact.narrativeSteady":
+    "No clear directional shift versus baseline yet under the current comparison rules. Keep syncing data and refresh snapshots as needed.",
+  "impact.narrativeMixed":
+    "Versus baseline: {i} metric(s) improved, {w} worsened. See the table below for detail.",
+  "impact.compareTableTitle": "Overview: baseline and current",
+  "impact.col.metric": "Metric",
+  "impact.col.direction": "Trend",
   "integrations.selectPlaceholder": "Choose…",
   "integrations.syncIncremental": "Sync",
   "integrations.syncIncrementalTitle":
