@@ -82,5 +82,6 @@ def ensure_baseline_snapshot(db: Session, workspace_id: str) -> bool:
     )
     if not has_mapping:
         return False
+    db.flush()
     save_metrics_snapshot(db, workspace_id, "baseline")
     return True
