@@ -339,10 +339,10 @@ This section tracks **what is implemented in this repository** today. Product vi
 - **Settings UI (`/settings/integrations`):** **list** of connections with **Синхронизировать / Редактировать / Отключить / Добавить**; full-screen **wizard** (credentials with verify + spinners → team/Space with refresh spinners → **обязательный** status mapping → done). Footer action order puts **«Назад»** left of primary actions. Workspace UUID override card removed (uses **`localStorage` `teamup_workspace_id`** from the sidebar switcher). **Редактировать** prefetch uses explicit team/Space IDs so selects stay populated after reload.
 - **Import:** parses ClickUp **`status`** as string or nested object (**`clickup_status_field_label`**); **`tasks.task_type`** column migrated to **`TEXT`** on PostgreSQL (custom-field JSON longer than VARCHAR(64)); user-facing error detail on failed import commits when possible.
 - **Sync:** Available once a **Space/scope id** exists (mapping still required for `ready` and analytics access). Import endpoint accepts **`sync_mode=auto|incremental|full`**; `auto` uses incremental by `date_updated_gt` after last sync (with overlap), otherwise full ~90-day import. Integrations UI exposes **incremental** and **full** actions separately.
-- **Scheduled sync pilot:** optional lightweight in-process scheduler (`CLICKUP_SYNC_SCHEDULER_ENABLED`, interval/delay envs) reuses the same `auto` sync path for scoped ClickUp connections. It records failures through existing sync observability and the integrations card shows scheduler state, expected stale-after time, and stale-data warning. This is a pilot mechanism, not the final Celery/background-worker architecture.
+- **Scheduled sync pilot:** optional lightweight in-process scheduler (`CLICKUP_SYNC_SCHEDULER_ENABLED`, interval/delay envs) reuses the same `auto` sync path for scoped ClickUp connections. It records failures through existing sync observability and the integrations card shows scheduler state, expected stale-after time, and stale-data warning. **Accepted for MVP:** pilot in-process scheduling; **not an MVP exit requirement:** migrating to a Celery/queue worker tier (see [`MVP_IMPLEMENTATION_PLAN.md`](MVP_IMPLEMENTATION_PLAN.md) §3.2 Phase 3).
 - **Sync observability:** `clickup_connections` now stores **`last_sync_attempt_at`**, **`last_sync_error`**, **`last_synced_at`**; frontend displays last attempt/error, timestamps in **browser local time** via `formatApiUtcAsLocal`.
 - **Provider transition history:** sync now calls ClickUp **Time in Status** (`/task/{id}/time_in_status` and bulk `bulk_time_in_status`) as the provider source for status timeline rows. If ClickUp returns a plan/ClickApp limitation (for example `TIS_027`), task import still succeeds; the success message and latest import event record that transition history is unavailable for the current provider plan.
-- **Ingestion:** on-demand import is hardened and incremental-capable; lightweight scheduler exists for pilot/dev, but **no dedicated Celery/worker sync loop yet**.
+- **Ingestion:** on-demand import is hardened and incremental-capable; lightweight scheduler suffices for MVP pilot workloads. **Dedicated worker fleets / exhaustive retry automation are intentionally post-MVP** unless ops scope them sooner.
 
 ### Analytics and product UI (partial)
 
@@ -350,7 +350,7 @@ This section tracks **what is implemented in this repository** today. Product vi
 - **Attention API:** `GET /api/analytics/attention/{workspace_id}` — scored tasks with textual explanations (rule-based v1).
 - **Analytics gate:** metrics/attention/impact and AI attention explain are blocked until workspace ClickUp mappings are fully configured across active connections.
 - **Tasks surface:** new **`/tasks`** page for debug + ops views — list/search/filter, parent/subtask hierarchy (expand/collapse and full-subtree controls), self/subtree attention columns, details slide-over with provider-backed transition timeline; when ClickUp does not expose Time in Status on the current plan, the details panel shows a localized provider-plan limitation message instead of implying a UI/data bug.
-- **Impact surface:** **`/impact`** compares current live metrics against the latest saved **baseline** snapshot; imports create the first baseline automatically once active workflow mappings exist. Users can still save baseline/current snapshots manually.
+- **Impact surface:** **`/impact`** compares current live metrics against the latest saved **baseline** snapshot; imports create the first baseline automatically once active workflow mappings exist. Users can save baseline/current snapshots manually. **History + SVG trends** use stored batches; optional **`IMPACT_WEEKLY_SNAPSHOT_*`** pilot scheduler appends **`weekly`** snapshots for mapped workspaces. Integrations connection list surfaces when that server flag is enabled.
 - **App surfaces:** **`/dashboard`**, **`/tasks`**, **`/attention`**, **`/impact`** with workspace context; fuller dashboard parity (deep bottleneck cards, rich filters, trend charts) vs §9 MVP wording is **still open**.
 
 ### AI foundation (MVP+ scaffold, partial)
@@ -368,7 +368,7 @@ This section tracks **what is implemented in this repository** today. Product vi
 
 ### Gaps versus full MVP wording (§9)
 
-- Production-grade background sync orchestration, deeper retry policy/alerts, richer Impact commentary/trends, PostgreSQL-heavy CI parity, and broader MVP+ AI capabilities (task-quality scoring, workspace/impact narratives, full contextual chat sessions) — see [`MVP_IMPLEMENTATION_PLAN.md`](MVP_IMPLEMENTATION_PLAN.md) cross-cutting notes.
+- Richer Impact/dashboard UX polish, PostgreSQL-heavy CI parity, and broader MVP+ AI capabilities (task-quality scoring, workspace/impact narratives, full contextual chat sessions) — see [`MVP_IMPLEMENTATION_PLAN.md`](MVP_IMPLEMENTATION_PLAN.md) cross-cutting notes. **Heavyweight background job platforms and deep automated retry ladders are deferred past MVP closure** (same plan §3).
 
 ---
 

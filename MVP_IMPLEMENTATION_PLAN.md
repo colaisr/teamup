@@ -46,7 +46,7 @@ MVP+ scope (immediately after core MVP):
 Suggested stack (Python-first):
 
 - Backend API: FastAPI
-- Background jobs: Celery (or equivalent worker queue)
+- Background jobs (**post-MVP / at scale:** Celery or equivalent worker queue; **MVP relies on on-demand imports + lightweight in-process schedulers where enabled**)
 - Relational store: PostgreSQL
 - Optional analytics acceleration: ClickHouse later if needed
 - Frontend: React (or Next.js)
@@ -122,17 +122,17 @@ Monorepo: `backend/` (FastAPI), `frontend/` (Next.js 14 App Router), `infra/`, `
 | **0 — Product foundations** | **Done** (docs) | Foundations, glossaries, pilot scope, permissions etc. under `docs/`. |
 | **1 — Bootstrap** | **Done** | Auth (JWT `Bearer`, `/api/auth/*`), registration + email verification, login; **`last_active_workspace_id`** persisted (`users`), **`GET /api/workspaces`** returns **`is_current`**, **`POST …/switch`** aligns server + frontend cache; **`PUT`** rename + member role updates (**owner**); **no workspace `DELETE`** from API (InfraZen-style); **invites** owner-only (**`GET`** full history vs pending via **`pending_only`**, **immediate membership** when invitee already registered); sidebar: **dashboard / attention / impact / integrations** + footer workspace switcher; workspaces **management** at **`/settings/user?tab=workspaces`** (**`/settings/workspace`** & **`/settings/members`** redirect); shield → **`/settings/system`** for **`is_system_admin`**. CI: `pytest`, `compileall`, ESLint, `next build`; auth pages `<Suspense>` for `useSearchParams`. Celery not in Phase 1. |
 | **2 — ClickUp** | **Partial** | **Personal API token** path only (**OAuth deferred** — `docs/CLICKUP_OAUTH_PHASE2.md`). **Multiple ClickUp connections** per TeamUp workspace; connection-scoped APIs: list/create by `workspace_id`, **`GET`/`PUT` credentials** (admin; **GET** returns decrypted token for edit-prefill), verify-token, scopes (teams/spaces/lists), scope save, statuses, mapping CRUD, **POST import** per `connection_id`. Legacy “latest connection” workspace routes are still documented in code. |
-| **3 — Ingestion** | **Partial** | **On-demand import** supports modes: **`auto`** (incremental after `last_synced_at` with overlap), **`incremental`**, **`full`** (~90 days by `date_created_gt`) for list/space sources. Import writes `Task`, `TaskTransition`, `ClickUpRawEvent`; hardens ClickUp status parsing (string/object) and stores custom field snapshot in `tasks.task_type` (**TEXT** on PostgreSQL). Status transition history now comes from ClickUp **Time in Status** provider APIs (single + bulk) when available; if the current ClickUp plan/ClickApp does not expose it, sync still succeeds and records a warning in the success message/import event. **Sync observability shipped** on connection (`last_sync_attempt_at`, `last_sync_error`, `last_synced_at`) and surfaced in integrations UI with incremental/full controls. **Lightweight scheduled sync pilot shipped**: optional in-process scheduler controlled by `CLICKUP_SYNC_SCHEDULER_*`, plus UI scheduler state/stale warning. **Still open:** dedicated worker/Celery architecture and deeper retry/QC automation. |
+| **3 — Ingestion** | **Partial (MVP-adequate)** | **On-demand import** supports **`auto`** (incremental after `last_synced_at` with overlap), **`incremental`**, **`full`** (~90 days by `date_created_gt`). Import writes `Task`, `TaskTransition`, `ClickUpRawEvent`; status parsing hardened; **`tasks.task_type`** as **TEXT** on PostgreSQL. **Time in Status** wired when ClickUp exposes it; otherwise sync succeeds with an explicit warning. **Sync observability** on connections and integrations UI (**incremental / full**). **In-process scheduler pilot** (`CLICKUP_SYNC_SCHEDULER_*`). **Not required for MVP closure:** migrating this to Celery/a worker queue or building a deeper automated retry playbook—those are **post-MVP / production-scale** improvements if traffic demands them. |
 | **4 — Mapping** | **Partial** | Mapping persisted per **connection + scope** with **versioning** on save. **Wizard** on **`/settings/integrations`** includes mandatory **status mapping** step before connection is **`ready`**; client **auto-suggest** from ClickUp status names. Onboarding **`/onboarding/mapping`** steers users to settings. **Analytics gating enforced** (`metrics`, `attention`, `impact`, AI attention explain) until all active ClickUp connections are `ready` and have active mappings. |
 | **5 — Normalized storage** | **Partial** | SQLAlchemy models + **`connection_id`** on tasks, transitions, raw events, workflow mappings; multi-connection migration/backfill; Postgres prod; SQLite dev. **`tasks.task_type`** widened to **TEXT** on PostgreSQL via startup migration. |
 | **6 — Metrics engine** | **Partial** | `GET /api/analytics/metrics/{workspace_id}` — medians, rework/reopen, time-in-status rollup; **uses active workflow mapping per `connection_id`** with fallback for legacy rows missing `connection_id`. Still **narrower** than full Phase 6 spec (e.g. idle/throughput breadth). |
 | **7 — Attention v1** | **Partial** | `GET /api/analytics/attention/{workspace_id}` — rule-based score + explanations; **thresholds/rules not fully aligned with Phase 7 spec.** |
 | **8 — Dashboard UI** | **Partial** | **`/settings/integrations`**: connection **list**; **add / edit / sync / full sync / disconnect**; full **wizard** (credentials with verify + loading states, team/Space refresh, mapping, done); **sync_mode** controls (incremental/full) + sync error visibility; **UTC timestamps shown in browser local time**. Routes **`/dashboard`**, **`/attention`**, **`/impact`**, onboarding and new **`/tasks`** page (debug/ops list with hierarchy, subtree attention, details slide-over + provider-backed transition timeline). If ClickUp Time in Status is unavailable on the current plan, the details panel shows a localized provider-plan limitation message. Core `/tasks` + AI assistant chrome now use Russian-first `t()` keys. Workspace/members stay under **user settings** (Phase 1). **No** full bottleneck cards / filters / weekly trend parity yet. |
-| **9 — Value / Impact** | **Partial** | Impact route now compares live current metrics against the latest saved **baseline** snapshot; first baseline is created automatically after a successful import once active mappings exist, and manual baseline/current snapshot buttons remain. **Still open:** richer before/after cards, trend history, commentary, and pilot-ready value narrative. |
+| **9 — Value / Impact** | **Partial** | Impact compares live metrics to the latest **baseline**; first baseline after import when mappings exist; manual baseline/current; **history API** + table; **SVG trends**; optional **`weekly`** snapshots (`IMPACT_WEEKLY_SNAPSHOT_*` pilot scheduler). Commentary (improved / worsened). **Still open for MVP polish:** tighter before/after cards, pilot-ready value narrative. Optionally later: move pilots off in-process threads to a durable worker queue if ops require it—not a blocker for MVP sign-off. |
 | **10 — Pilot ops** | **Not started** | Process — see `docs/PILOT_RUNBOOK.md`. |
 | **8.5 / MVP+ AI** | **Partial** | **Foundation shipped:** system-admin AI settings in **`/settings/system`** (OpenRouter key/model + refresh models + test connection), provider abstraction in **`openrouter_client.py`** (`chat_complete`, model resolution, shared errors), central platform config in **`ai_platform.py`**, audit tables **`ai_runs`** + **`ai_outputs`**, and first product endpoint **`POST /api/ai/attention/{workspace_id}/explain-task`**. Explain context now supports **`include_subtasks`** to analyze task trees (task + descendants, merged reasons/transitions/evidence). Frontend scaffolding: global assistant panel + per-task explain actions on `/attention` and `/tasks`. **Still open:** task-quality scoring, workspace/impact narratives, full chat sessions/messages persistence, optional streaming UX. |
 
-Cross-cutting gaps vs DoD MVP: production-grade scheduled/background sync orchestration (beyond the current in-process pilot scheduler) and richer retry policy; stricter §3.1 i18n quality automation (missing-key checker + remaining non-core literal cleanup); richer dashboard & Impact trend/commentary parity; Postgres-backed parity tests where needed. For **MVP+ AI**: extend beyond attention explanation to task-quality checks, workspace/impact narratives, and full chat session lifecycle.
+Cross-cutting gaps vs DoD MVP: stricter §3.1 i18n quality automation (missing-key checker + remaining non-core literal cleanup); richer **dashboard / Impact UX** (before/after cards, bottleneck views); Postgres-backed parity tests where needed. **Post-MVP (when scaling traffic):** replace in-process scheduler threads with queue/worker deployments and deepen retry/backoff—not listed as MVP exit blockers here. For **MVP+ AI**: task-quality scoring, workspace/impact narratives, full chat session lifecycle.
 
 See also **`PROJECT_OVERVIEW.md` § Implementation wiki.**
 
@@ -140,16 +140,17 @@ See also **`PROJECT_OVERVIEW.md` § Implementation wiki.**
 
 These steps close the strongest gaps versus §2 and §10 (Definition of Done), in pragmatic order:
 
-1. **Workflow mapping enforcement UX hardening (Phase 4)** — API rule is enforced; next tighten UX copy/states across all analytics consumers and future endpoints to keep the rule explicit.
-2. **Production sync retries (Phase 3)** — Current manual `sync_mode` import, observability, and lightweight in-process scheduler/stale alerts are in place; next decide whether to keep a single-worker cron path for pilot or move to Celery-style orchestration with retry/backoff.
-3. **Impact parity (§6 notes + Phase 9)** — Baseline auto-create + current comparison exists; next add weekly/current snapshot history, commentary, and tighter “before / after” cards.
-4. **Metrics & Attention completeness (Phases 6–7)** — Expand metrics API toward full Lead/Cycle/WIP/threshold coverage; align Attention thresholds with §5 weighting/spec.
-5. **Dashboard UX depth (Phase 8)** — Bottleneck / time-in-status views, filters, weekly trend strips as MVP narrative requires.
-6. **§3.1 i18n quality gate** — Script or CI check for missing `ru`/`en` keys; purge remaining stray literals outside the now-localized `/tasks` and AI assistant chrome.
-7. **Pilot readiness (Phase 10)** — When items 1–3 are minimally satisfied, execute `docs/PILOT_RUNBOOK.md`, intervention logging, exit review.
-8. **AI capability rollout on new foundation (Phase 8.5)** — Keep deterministic context + evidence refs as mandatory; next add **workspace metrics takeaways**, **impact narrative**, and **task description quality** atop existing `ai_runs`/`ai_outputs` + `/api/ai` routing skeleton.
+1. **Workflow mapping enforcement UX hardening (Phase 4)** — API rule is enforced; tighten UX copy/states across analytics consumers so the rule stays obvious everywhere.
+2. **Impact parity (§6 notes + Phase 9)** — Core flows shipped (baseline, comparison, history, trends, commentary, pilot **weekly** snapshots). **Next for MVP polish:** tighter “before / after” cards and a clear pilot value narrative—not infrastructure churn.
+3. **Metrics & Attention completeness (Phases 6–7)** — Expand metrics API toward full Lead/Cycle/WIP/threshold coverage; align Attention thresholds with §5 weighting/spec.
+4. **Dashboard UX depth (Phase 8)** — Bottleneck / time-in-status views, filters, weekly narrative strips where the MVP story needs them.
+5. **§3.1 i18n quality gate** — Script or CI check for missing `ru`/`en` keys; purge remaining stray literals outside localized surfaces.
+6. **Pilot readiness (Phase 10)** — When mapping UX (1), Impact/card polish (2), and the minimum narrative (2–4 as needed for your pilot) feel ready, execute `docs/PILOT_RUNBOOK.md`, intervention logging, exit review.
+7. **AI capability rollout on new foundation (Phase 8.5)** — Keep deterministic context + evidence refs mandatory; add **workspace takeaways**, **impact narrative**, **task description quality** atop `ai_runs`/`ai_outputs` + `/api/ai`.
 
-If you must pick **one** next milestone: **`1` + sketch for `2`** (trustworthy normalized analytics + repeatable data freshness) before heavy dashboard polish—otherwise UI work risks churn on wrong numbers.
+*(**Post-MVP / scale:** Celery-or-equivalent workers, automated retry tiers, fully durable job queues—explicitly **out of MVP critical path** unless your deployment already demands them.)*
+
+If you must pick **one** next milestone: **workflow mapping UX hardening (1)** so every pilot participant hits trustworthy analytics paths before heavier dashboard polish.
 
 ## 4) Execution Phases
 
@@ -200,13 +201,13 @@ Exit criteria:
 Deliverables:
 
 - Historical import job (2-3 months).
-- Incremental sync job (scheduled).
+- Incremental sync job (scheduled **for MVP**: manual triggers + optional in-process scheduler; **queue/worker offload is post-MVP** unless you explicitly scope it earlier).
 - Ingest task core fields, status changes, assignees, timestamps, available time data.
-- Data quality checks and retry logic.
+- Lightweight data quality posture: observable sync outcomes and surfaced errors (**deep automated retry / Celery backlog: explicitly not MVP-critical—see §3.2 Phase 3**).
 
 Exit criteria:
 
-- Stable ingestion with repeatable sync and observable logs.
+- Stable ingestion with observable logs **for the MVP pilot footprint** (on-demand import + pilot scheduler acceptable). Dedicated worker fleets and exhaustive retry tiers are optional hardening afterward.
 
 ### Phase 4 - Workflow Mapping Setup (Critical)
 
@@ -320,7 +321,7 @@ Deliverables:
 
 - Baseline snapshot at pilot start.
 - Current period snapshot.
-- Before/after comparison cards and charts.
+- Before/after comparison cards and charts (including **snapshot-history trend charts** on `/impact`).
 - Change commentary block ("what improved / worsened").
 
 Exit criteria:

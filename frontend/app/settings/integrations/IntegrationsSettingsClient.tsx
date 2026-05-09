@@ -6,6 +6,14 @@ import { api, explainApiError } from "@/lib/api";
 import { formatApiUtcAsLocal } from "@/lib/datetime";
 import { t } from "@/lib/i18n";
 
+type ConnectionsListResponse = {
+  workspace_id: string;
+  connections: Connection[];
+  impact_weekly_snapshot_scheduler_enabled?: boolean;
+  impact_weekly_snapshot_interval_hours?: number;
+  impact_weekly_snapshot_tick_interval_hours?: number;
+};
+
 type ProviderId = "clickup";
 
 type TeamRow = {
@@ -110,6 +118,11 @@ function autoMapStatus(raw: string): string {
 
 export default function IntegrationsSettingsClient() {
   const [connections, setConnections] = useState<Connection[]>([]);
+  const [impactWeeklyMeta, setImpactWeeklyMeta] = useState({
+    enabled: false,
+    intervalHours: 168,
+    tickHours: 24
+  });
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [pageMessage, setPageMessage] = useState("");
@@ -182,10 +195,15 @@ export default function IntegrationsSettingsClient() {
       return;
     }
     try {
-      const res = await api<{ workspace_id: string; connections: Connection[] }>(
+      const res = await api<ConnectionsListResponse>(
         `/api/integrations/clickup/connections/${encodeURIComponent(wid)}`
       );
       setConnections(res.connections || []);
+      setImpactWeeklyMeta({
+        enabled: Boolean(res.impact_weekly_snapshot_scheduler_enabled),
+        intervalHours: res.impact_weekly_snapshot_interval_hours ?? 168,
+        tickHours: res.impact_weekly_snapshot_tick_interval_hours ?? 24
+      });
       setPageMessage("");
     } catch (e: unknown) {
       setConnections([]);
@@ -716,6 +734,15 @@ export default function IntegrationsSettingsClient() {
           <h2 style={{ margin: 0, flex: 1, fontSize: 18, fontWeight: 700 }}>{t("integrations.connectionsHeading")}</h2>
           <button className="btn" type="button" disabled={busy} onClick={() => void openAddWizard()}>{t("integrations.addConnection")}</button>
         </div>
+        {impactWeeklyMeta.enabled ? (
+          <div className="card" style={{ padding: "10px 12px", fontSize: 13 }}>
+            <p className="muted" style={{ margin: 0 }}>
+              {t("integrations.impactWeeklySchedulerOn").replace("{hours}", String(impactWeeklyMeta.intervalHours))}
+              {" · "}
+              {t("integrations.impactWeeklySchedulerTick").replace("{hours}", String(impactWeeklyMeta.tickHours))}
+            </p>
+          </div>
+        ) : null}
         {connections.length === 0 ? (
           <div className="card" style={{ textAlign: "center", padding: "20px 14px" }}>
             <p className="muted" style={{ margin: 0 }}>{t("integrations.emptyState")}</p>

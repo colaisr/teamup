@@ -178,6 +178,9 @@ class ClickUpConnectionOut(BaseModel):
 class ClickUpConnectionListOut(BaseModel):
     workspace_id: str
     connections: list[ClickUpConnectionOut]
+    impact_weekly_snapshot_scheduler_enabled: bool = False
+    impact_weekly_snapshot_interval_hours: int = 168
+    impact_weekly_snapshot_tick_interval_hours: int = 24
 
 
 class AttentionTaskOut(BaseModel):

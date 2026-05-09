@@ -425,7 +425,13 @@ def list_connections(workspace_id: str, db: Session = Depends(get_db), current_u
         .order_by(ClickUpConnection.updated_at.desc())
         .all()
     )
-    return ClickUpConnectionListOut(workspace_id=workspace_id, connections=[_serialize_connection(r) for r in rows])
+    return ClickUpConnectionListOut(
+        workspace_id=workspace_id,
+        connections=[_serialize_connection(r) for r in rows],
+        impact_weekly_snapshot_scheduler_enabled=settings.impact_weekly_snapshot_scheduler_enabled,
+        impact_weekly_snapshot_interval_hours=max(1, settings.impact_weekly_snapshot_interval_hours),
+        impact_weekly_snapshot_tick_interval_hours=max(1, settings.impact_weekly_snapshot_tick_interval_hours),
+    )
 
 
 @router.post("/clickup/connections", response_model=ClickUpConnectionOut)

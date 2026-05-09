@@ -12,6 +12,10 @@ from app.db_migrate import (
 )
 from app.routers import admin_ai, ai, analytics, auth, integrations, tasks, workspaces
 from app.services.clickup_scheduler import start_clickup_sync_scheduler, stop_clickup_sync_scheduler
+from app.services.impact_weekly_scheduler import (
+    start_impact_weekly_snapshot_scheduler,
+    stop_impact_weekly_snapshot_scheduler,
+)
 
 app = FastAPI(title="TeamUp API", version="0.1.0")
 
@@ -34,11 +38,13 @@ def startup():
     ensure_tasks_parent_source_task_id_column(engine)
     ensure_tasks_task_type_text(engine)
     start_clickup_sync_scheduler()
+    start_impact_weekly_snapshot_scheduler()
 
 
 @app.on_event("shutdown")
 def shutdown():
     stop_clickup_sync_scheduler()
+    stop_impact_weekly_snapshot_scheduler()
 
 
 @app.get("/health")

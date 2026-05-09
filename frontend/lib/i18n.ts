@@ -125,6 +125,12 @@ const ru: Dict = {
   "impact.snapshotTypeLabel": "Тип",
   "impact.snapshotType.baseline": "Baseline",
   "impact.snapshotType.current": "Текущий",
+  "impact.snapshotType.weekly": "Еженедельный (авто)",
+  "impact.trendsTitle": "Динамика по сохранённым снимкам",
+  "impact.trendsHint":
+    "По горизонтали: от более раннего снимка к более позднему. Линия соединяет значения метрики при каждом сохранении.",
+  "impact.trendsHintShort": "Пока один снимок — показана точка. Сохраняйте снимки чаще, чтобы увидеть линию тренда.",
+  "impact.trendsScale": "Диапазон на графике",
   "settings.workspace.title": "Настройки рабочего пространства",
   "settings.members.title": "Участники и приглашения",
   "settings.integrations.title": "Интеграции",
@@ -160,6 +166,9 @@ const ru: Dict = {
   "integrations.schedulerEnabled": "Автосинхронизация включена: каждые {minutes} мин.",
   "integrations.schedulerDisabled": "Автосинхронизация выключена.",
   "integrations.schedulerStaleAfter": "устареет после",
+  "integrations.impactWeeklySchedulerOn":
+    "На сервере включены автоматические снимки эффекта (/impact): тип «еженедельный», не реже чем раз в {hours} ч для готовых интеграций.",
+  "integrations.impactWeeklySchedulerTick": "Проверка расписания каждые ~{hours} ч (пилотный поток в процессе backend).",
   "integrations.syncStaleWarning": "Данные могут быть устаревшими: запустите синхронизацию или проверьте автосинхронизацию.",
   "integrations.gotoMapping": "Маппинг статусов →",
   "integrations.connectionsHeading": "Подключённые интеграции",
@@ -397,6 +406,12 @@ const en: Dict = {
   "impact.snapshotTypeLabel": "Type",
   "impact.snapshotType.baseline": "Baseline",
   "impact.snapshotType.current": "Current",
+  "impact.snapshotType.weekly": "Weekly (scheduled)",
+  "impact.trendsTitle": "Trends from saved snapshots",
+  "impact.trendsHint":
+    "Horizontal axis runs from the earliest saved snapshot to the latest. The line connects the metric at each save.",
+  "impact.trendsHintShort": "Only one snapshot so far — shown as a dot. Save more snapshots to see a trend line.",
+  "impact.trendsScale": "Chart range",
   "integrations.selectPlaceholder": "Choose…",
   "integrations.syncIncremental": "Sync",
   "integrations.syncIncrementalTitle":
@@ -409,6 +424,9 @@ const en: Dict = {
   "integrations.schedulerEnabled": "Auto-sync enabled: every {minutes} min.",
   "integrations.schedulerDisabled": "Auto-sync disabled.",
   "integrations.schedulerStaleAfter": "stale after",
+  "integrations.impactWeeklySchedulerOn":
+    "Impact auto-snapshots are enabled on the server (/impact): «weekly» saves at most every {hours} hours for workspaces with mapped ClickUp.",
+  "integrations.impactWeeklySchedulerTick": "The scheduler wakes about every ~{hours} hours to check due workspaces (backend in-process pilot).",
   "integrations.syncStaleWarning": "Data may be stale: run sync or check auto-sync.",
   "ai.fabOpen": "AI Assistant",
   "ai.panelTitle": "Assistant",

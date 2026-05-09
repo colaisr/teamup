@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import MetricSnapshot, WorkflowMapping
@@ -15,6 +16,9 @@ IMPACT_METRICS = (
     "reopen_rate",
     "task_count",
 )
+
+# Automated periodic snapshots (see impact_weekly_scheduler); distinct from manual "current".
+SNAPSHOT_TYPE_WEEKLY = "weekly"
 
 
 def latest_snapshot_values(db: Session, workspace_id: str, snapshot_type: str) -> dict[str, float]:
@@ -96,6 +100,17 @@ def list_impact_snapshot_history(
             }
         )
     return out
+
+
+def latest_snapshot_created_at(db: Session, workspace_id: str, snapshot_type: str) -> datetime | None:
+    return (
+        db.query(func.max(MetricSnapshot.created_at))
+        .filter(
+            MetricSnapshot.workspace_id == workspace_id,
+            MetricSnapshot.snapshot_type == snapshot_type,
+        )
+        .scalar()
+    )
 
 
 def save_metrics_snapshot(db: Session, workspace_id: str, snapshot_type: str) -> int:

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { ImpactTrendCharts, type ImpactHistorySnapshot } from "@/components/impact/ImpactTrendCharts";
 import { api, explainApiError } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import { isAnalyticsMappingBlockedMessage } from "@/lib/mappingBlocked";
@@ -24,14 +25,6 @@ type ImpactResponse = {
     improved: string[];
     worsened: string[];
   };
-};
-
-type ImpactHistorySnapshot = {
-  snapshot_type: string;
-  period_start: string | null;
-  period_end: string | null;
-  created_at: string | null;
-  metrics: Record<string, number>;
 };
 
 type ImpactHistoryResponse = {
@@ -124,6 +117,7 @@ export default function ImpactPage() {
   function snapshotTypeLabel(type: string): string {
     if (type === "baseline") return t("impact.snapshotType.baseline");
     if (type === "current") return t("impact.snapshotType.current");
+    if (type === "weekly") return t("impact.snapshotType.weekly");
     return type;
   }
 
@@ -166,6 +160,14 @@ export default function ImpactPage() {
               : t("impact.noWorsened")}
           </p>
         </div>
+      ) : null}
+      {workspaceId && historySynced && historyRows.length > 0 ? (
+        <ImpactTrendCharts
+          snapshots={historyRows}
+          metricKeys={HISTORY_METRIC_ORDER}
+          metricLabel={metricLabel}
+          formatValue={formatMetricValue}
+        />
       ) : null}
       {rows.map((row) => (
         <div key={row.metric} className="card">
