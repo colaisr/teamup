@@ -39,7 +39,7 @@ export default function AiAssistantPanel() {
         onClick={toggle}
         style={{ position: "fixed", right: 16, bottom: 16, zIndex: 10030 }}
       >
-        AI Assistant
+        {t("ai.fabOpen")}
       </button>
 
       {open ? (
@@ -57,37 +57,37 @@ export default function AiAssistantPanel() {
             background: "#0b1220",
             padding: 14,
             display: "grid",
-            gap: 12
+            gap: 12,
           }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <strong>Assistant</strong>
+            <strong>{t("ai.panelTitle")}</strong>
             <button type="button" className="btn" onClick={close}>
-              Close
+              {t("common.close")}
             </button>
           </div>
           <p className="muted" style={{ margin: 0 }}>
-            Page: {pagePath || "-"} | Workspace: {workspaceId || "-"}
+            {t("ai.pageLabel")}: {pagePath || "—"} · {t("ai.workspaceLabel")}: {workspaceId || "—"}
           </p>
           <p className="muted" style={{ margin: 0 }}>
-            MVP chat scaffold. First capability: explain one attention task by ID.
+            {t("ai.scaffoldIntro")}
           </p>
           <div style={{ display: "grid", gap: 8 }}>
             <input
               value={taskId}
               onChange={(e) => setTaskId(e.target.value)}
-              placeholder="source_task_id"
+              placeholder={t("ai.taskIdPlaceholder")}
               style={{
                 width: "100%",
                 padding: "8px 10px",
                 borderRadius: 8,
                 border: "1px solid #334155",
                 background: "#111827",
-                color: "#e5e7eb"
+                color: "#e5e7eb",
               }}
             />
             <button type="button" className="btn" disabled={busy} onClick={() => void onExplain()}>
-              {busy ? "AI..." : "Explain task"}
+              {busy ? t("ai.busyShort") : t("ai.explainTask")}
             </button>
           </div>
           {error ? (

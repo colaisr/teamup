@@ -1,5 +1,7 @@
 "use client";
 
+import { t } from "@/lib/i18n";
+
 type Props = {
   busy?: boolean;
   onClick: () => void;
@@ -15,7 +17,7 @@ export default function AiActionButton({ busy = false, onClick, children }: Prop
       onClick={onClick}
       style={{ background: "#1e3a8a", borderColor: "#3b82f6" }}
     >
-      {busy ? "AI..." : children}
+      {busy ? t("ai.busyShort") : children}
     </button>
   );
 }

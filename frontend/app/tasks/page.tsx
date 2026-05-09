@@ -234,7 +234,7 @@ export default function TasksPage() {
       </p>
 
       <div className="card" style={{ display: "grid", gap: 10 }}>
-        <input value={workspaceId} onChange={(event) => setWorkspaceId(event.target.value)} placeholder="workspace_id" />
+        <input value={workspaceId} onChange={(event) => setWorkspaceId(event.target.value)} placeholder={t("tasks.workspacePlaceholder")} />
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -288,7 +288,7 @@ export default function TasksPage() {
                               className="btn btnGhost"
                               style={{ padding: "2px 6px", minWidth: 30 }}
                               onClick={() => toggleExpanded(row.source_task_id)}
-                              title="Expand/collapse direct children"
+                              title={t("tasks.treeToggleDirect")}
                             >
                               {expandedIds.has(row.source_task_id) ? "−" : "+"}
                             </button>
@@ -297,7 +297,7 @@ export default function TasksPage() {
                               className="btn btnGhost"
                               style={{ padding: "2px 6px", minWidth: 30 }}
                               onClick={() => expandSubtree(row.source_task_id)}
-                              title="Expand full subtree"
+                              title={t("tasks.treeExpandSubtree")}
                             >
                               ++
                             </button>
@@ -306,7 +306,7 @@ export default function TasksPage() {
                               className="btn btnGhost"
                               style={{ padding: "2px 6px", minWidth: 30 }}
                               onClick={() => collapseSubtree(row.source_task_id)}
-                              title="Collapse full subtree"
+                              title={t("tasks.treeCollapseSubtree")}
                             >
                               --
                             </button>
@@ -316,48 +316,80 @@ export default function TasksPage() {
                         )}
                         <div>
                           <div style={{ fontWeight: 600 }}>{row.title}</div>
-                          <div className="muted">ID: {row.source_task_id}</div>
-                          {row.assignee_email ? <div className="muted">Assignee: {row.assignee_email}</div> : null}
-                          {row.is_subtask ? <div className="muted">Subtask</div> : null}
+                          <div className="muted">
+                            {t("tasks.labelId")}: {row.source_task_id}
+                          </div>
+                          {row.assignee_email ? (
+                            <div className="muted">
+                              {t("tasks.labelAssignee")}: {row.assignee_email}
+                            </div>
+                          ) : null}
+                          {row.is_subtask ? <div className="muted">{t("tasks.subtaskBadge")}</div> : null}
                           <button
                             type="button"
                             className="btn btnGhost"
                             style={{ marginTop: 6, padding: "4px 8px" }}
                             onClick={() => void openTaskDetails(row.source_task_id, includeSubtasksInDetails)}
                           >
-                            Details
+                            {t("tasks.detailsBtn")}
                           </button>
                         </div>
                       </div>
                     </td>
                     <td style={{ verticalAlign: "top", padding: "8px 6px", minWidth: 180 }}>
-                      <div>Raw: {row.current_status || "-"}</div>
-                      <div className="muted">Norm: {row.normalized_status || "-"}</div>
+                      <div>
+                        {t("tasks.statusRaw")}: {row.current_status || "—"}
+                      </div>
+                      <div className="muted">
+                        {t("tasks.statusNorm")}: {row.normalized_status || "—"}
+                      </div>
                     </td>
                     <td style={{ verticalAlign: "top", padding: "8px 6px", minWidth: 240 }}>
-                      <div>Children: {row.child_count}</div>
-                      <div className="muted">Descendants: {row.descendant_count}</div>
-                      <div className="muted">Open descendants: {row.open_descendant_count}</div>
+                      <div>
+                        {t("tasks.relationsChildren")}: {row.child_count}
+                      </div>
+                      <div className="muted">
+                        {t("tasks.relationsDescendants")}: {row.descendant_count}
+                      </div>
+                      <div className="muted">
+                        {t("tasks.relationsOpenDescendants")}: {row.open_descendant_count}
+                      </div>
                       {row.parent_source_task_id ? (
                         <div className="muted" title={row.parent_title || undefined}>
-                          Parent: {row.parent_source_task_id}
+                          {t("tasks.relationsParent")}: {row.parent_source_task_id}
                         </div>
                       ) : null}
                     </td>
                     <td style={{ verticalAlign: "top", padding: "8px 6px", minWidth: 240 }}>
-                      <div>Self: {row.self_attention_score}</div>
-                      <div>Subtree: {row.subtree_attention_score}</div>
+                      <div>
+                        {t("tasks.attentionSelf")}: {row.self_attention_score}
+                      </div>
+                      <div>
+                        {t("tasks.attentionSubtree")}: {row.subtree_attention_score}
+                      </div>
                       {row.attention_reasons.length > 0 ? (
-                        <div className="muted">Reasons: {row.attention_reasons.join(", ")}</div>
+                        <div className="muted">
+                          {t("tasks.attentionReasons")}: {row.attention_reasons.join(", ")}
+                        </div>
                       ) : (
-                        <div className="muted">Reasons: -</div>
+                        <div className="muted">
+                          {t("tasks.attentionReasons")}: —
+                        </div>
                       )}
                     </td>
                     <td style={{ verticalAlign: "top", padding: "8px 6px", minWidth: 240 }}>
-                      <div className="muted">Updated: {formatApiUtcAsLocal(row.updated_at_source)}</div>
-                      <div className="muted">Due: {formatApiUtcAsLocal(row.due_at_source)}</div>
-                      <div className="muted">Done: {formatApiUtcAsLocal(row.completed_at_source)}</div>
-                      <div className="muted">Last sync: {formatApiUtcAsLocal(row.last_synced_at)}</div>
+                      <div className="muted">
+                        {t("tasks.dateUpdated")}: {formatApiUtcAsLocal(row.updated_at_source) || "—"}
+                      </div>
+                      <div className="muted">
+                        {t("tasks.dateDue")}: {formatApiUtcAsLocal(row.due_at_source) || "—"}
+                      </div>
+                      <div className="muted">
+                        {t("tasks.dateDone")}: {formatApiUtcAsLocal(row.completed_at_source) || "—"}
+                      </div>
+                      <div className="muted">
+                        {t("tasks.dateLastSync")}: {formatApiUtcAsLocal(row.last_synced_at) || "—"}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -380,7 +412,7 @@ export default function TasksPage() {
             }}
           />
           <aside
-            aria-label="Task details"
+            aria-label={t("tasks.detailsPanelAria")}
             style={{
               position: "fixed",
               right: 0,
@@ -398,11 +430,11 @@ export default function TasksPage() {
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-              <strong>Task details</strong>
+              <strong>{t("tasks.detailsTitle")}</strong>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 {selectedTaskId ? <span className="muted">{selectedTaskId}</span> : null}
                 <button type="button" className="btn btnGhost" onClick={closeDetailsPanel}>
-                  Close
+                  {t("common.close")}
                 </button>
               </div>
             </div>
@@ -412,7 +444,7 @@ export default function TasksPage() {
                 checked={includeSubtasksInDetails}
                 onChange={(event) => setIncludeSubtasksInDetails(event.target.checked)}
               />
-              Include subtasks in timeline/details
+              {t("tasks.includeSubtasksInTimeline")}
             </label>
             {selectedTaskId ? (
               <button
@@ -421,14 +453,14 @@ export default function TasksPage() {
                 disabled={detailsBusy}
                 onClick={() => void openTaskDetails(selectedTaskId, includeSubtasksInDetails)}
               >
-                {detailsBusy ? `${t("common.loading")}...` : "Reload details"}
+                {detailsBusy ? `${t("common.loading")}...` : t("tasks.reloadDetails")}
               </button>
             ) : null}
 
             {details ? (
               <>
                 <p className="muted" style={{ margin: 0 }}>
-                  Descendants in scope: {details.descendant_task_ids.length}
+                  {t("tasks.descendantsInScope")}: {details.descendant_task_ids.length}
                 </p>
                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                   <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -437,10 +469,10 @@ export default function TasksPage() {
                       checked={aiIncludeSubtasks}
                       onChange={(event) => setAiIncludeSubtasks(event.target.checked)}
                     />
-                    AI: include subtasks in analysis
+                    {t("tasks.aiIncludeSubtasks")}
                   </label>
                   <AiActionButton busy={aiBusy} onClick={() => void explainSelectedTask()}>
-                    Explain with AI
+                    {t("tasks.explainWithAi")}
                   </AiActionButton>
                 </div>
                 {aiResult ? (
@@ -454,17 +486,17 @@ export default function TasksPage() {
                 ) : null}
 
                 <div>
-                  <strong>Transition timeline</strong>
+                  <strong>{t("tasks.transitionTimeline")}</strong>
                   {details.transitions.length === 0 ? (
                     <p className="muted" style={{ marginBottom: 0 }}>
-                      No transitions.
+                      {t("tasks.noTransitions")}
                     </p>
                   ) : (
                     <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
                       {details.transitions.map((transition, idx) => (
                         <div key={`${transition.task_source_id}-${transition.transitioned_at}-${idx}`} className="muted">
                           [{formatApiUtcAsLocal(transition.transitioned_at)}] {transition.task_source_id}:{" "}
-                          {transition.from_status || "-"} → {transition.to_status}
+                          {transition.from_status || "—"} → {transition.to_status}
                         </div>
                       ))}
                     </div>
