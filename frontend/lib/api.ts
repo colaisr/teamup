@@ -31,6 +31,38 @@ export function setToken(token: string | null) {
 }
 
 /** Поясняет ошибки сети для пользователя (RU). */
+const API_ERROR_CODE_PROP = "apiErrorCode";
+
+/** FastAPI may return `detail: { code, message }` for stable client handling. */
+export type ApiErrorWithCode = Error & { readonly apiErrorCode?: string };
+
+function throwHttpDetail(detail: unknown, httpStatus: number): never {
+  if (typeof detail === "string" && detail.trim().length > 0) {
+    throw new Error(detail.trim());
+  }
+  if (
+    detail &&
+    typeof detail === "object" &&
+    !Array.isArray(detail) &&
+    "message" in detail &&
+    typeof (detail as { message: unknown }).message === "string"
+  ) {
+    const msg = ((detail as { message: string }).message || "").trim() || `HTTP ${httpStatus}`;
+    const codeRaw = (detail as { code?: unknown }).code;
+    const code = typeof codeRaw === "string" ? codeRaw : undefined;
+    const err = new Error(msg) as ApiErrorWithCode;
+    if (code) Object.defineProperty(err, API_ERROR_CODE_PROP, { value: code, enumerable: true });
+    throw err;
+  }
+  if (Array.isArray(detail) && detail.length > 0) {
+    const first = detail[0];
+    if (first && typeof first === "object" && "msg" in first && typeof (first as { msg: unknown }).msg === "string") {
+      throw new Error((first as { msg: string }).msg);
+    }
+  }
+  throw new Error(`HTTP ${httpStatus}`);
+}
+
 export function explainApiError(error: unknown): string {
   if (!(error instanceof Error)) return "Произошла ошибка. Попробуйте ещё раз.";
   const m = error.message || "";
@@ -63,15 +95,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     }
     if (payload && typeof payload === "object" && "detail" in payload) {
       const detail = (payload as { detail?: unknown }).detail;
-      if (typeof detail === "string" && detail.trim().length > 0) {
-        throw new Error(detail);
-      }
-      if (Array.isArray(detail) && detail.length > 0) {
-        const first = detail[0];
-        if (first && typeof first === "object" && "msg" in first && typeof (first as { msg: unknown }).msg === "string") {
-          throw new Error((first as { msg: string }).msg);
-        }
-      }
+      throwHttpDetail(detail, res.status);
     }
     if (typeof payload === "string" && payload.trim().length > 0) {
       const s = payload.length > 400 ? `${payload.slice(0, 400)}…` : payload;

@@ -123,7 +123,7 @@ Monorepo: `backend/` (FastAPI), `frontend/` (Next.js 14 App Router), `infra/`, `
 | **1 — Bootstrap** | **Done** | Auth (JWT `Bearer`, `/api/auth/*`), registration + email verification, login; **`last_active_workspace_id`** persisted (`users`), **`GET /api/workspaces`** returns **`is_current`**, **`POST …/switch`** aligns server + frontend cache; **`PUT`** rename + member role updates (**owner**); **no workspace `DELETE`** from API (InfraZen-style); **invites** owner-only (**`GET`** full history vs pending via **`pending_only`**, **immediate membership** when invitee already registered); sidebar: **dashboard / attention / impact / integrations** + footer workspace switcher; workspaces **management** at **`/settings/user?tab=workspaces`** (**`/settings/workspace`** & **`/settings/members`** redirect); shield → **`/settings/system`** for **`is_system_admin`**. CI: `pytest`, `compileall`, ESLint, `next build`; auth pages `<Suspense>` for `useSearchParams`. Celery not in Phase 1. |
 | **2 — ClickUp** | **Partial** | **Personal API token** path only (**OAuth deferred** — `docs/CLICKUP_OAUTH_PHASE2.md`). **Multiple ClickUp connections** per TeamUp workspace; connection-scoped APIs: list/create by `workspace_id`, **`GET`/`PUT` credentials** (admin; **GET** returns decrypted token for edit-prefill), verify-token, scopes (teams/spaces/lists), scope save, statuses, mapping CRUD, **POST import** per `connection_id`. Legacy “latest connection” workspace routes are still documented in code. |
 | **3 — Ingestion** | **Partial (MVP-adequate)** | **On-demand import** supports **`auto`** (incremental after `last_synced_at` with overlap), **`incremental`**, **`full`** (~90 days by `date_created_gt`). Import writes `Task`, `TaskTransition`, `ClickUpRawEvent`; status parsing hardened; **`tasks.task_type`** as **TEXT** on PostgreSQL. **Time in Status** wired when ClickUp exposes it; otherwise sync succeeds with an explicit warning. **Sync observability** on connections and integrations UI (**incremental / full**). **In-process scheduler pilot** (`CLICKUP_SYNC_SCHEDULER_*`). **Not required for MVP closure:** migrating this to Celery/a worker queue or building a deeper automated retry playbook—those are **post-MVP / production-scale** improvements if traffic demands them. |
-| **4 — Mapping** | **Partial** | Mapping persisted per **connection + scope** with **versioning** on save. **Wizard** on **`/settings/integrations`** includes mandatory **status mapping** step before connection is **`ready`**; client **auto-suggest** from ClickUp status names. Onboarding **`/onboarding/mapping`** steers users to settings. **Analytics gating enforced** (`metrics`, `attention`, `impact`, AI attention explain) until all active ClickUp connections are `ready` and have active mappings. |
+| **4 — Mapping** | **Partial (UX strengthened)** | Mapping persisted per **connection + scope** with **versioning** on save. **Wizard** on **`/settings/integrations`** includes mandatory **status mapping** before **`ready`**; client **auto-suggest**. **Analytics gating** (`metrics`, `attention`, `impact`, AI explain) returns **HTTP 403** with structured `detail: { code: analytics_mappings_incomplete, message }` (not RU-text-only heuristics). **Product UI:** shared **`AnalyticsMappingBlockedCallout`** on **`/dashboard`**, **`/attention`**, **`/impact`**, and the **AI assistant** panel; **`/onboarding/mapping`** uses i18n-only copy. **Still polishable:** edge-case hints per connection state (draft vs missing mapping). |
 | **5 — Normalized storage** | **Partial** | SQLAlchemy models + **`connection_id`** on tasks, transitions, raw events, workflow mappings; multi-connection migration/backfill; Postgres prod; SQLite dev. **`tasks.task_type`** widened to **TEXT** on PostgreSQL via startup migration. |
 | **6 — Metrics engine** | **Partial** | `GET /api/analytics/metrics/{workspace_id}` — medians, rework/reopen, time-in-status rollup; **uses active workflow mapping per `connection_id`** with fallback for legacy rows missing `connection_id`. Still **narrower** than full Phase 6 spec (e.g. idle/throughput breadth). |
 | **7 — Attention v1** | **Partial** | `GET /api/analytics/attention/{workspace_id}` — rule-based score + explanations; **thresholds/rules not fully aligned with Phase 7 spec.** |
@@ -140,17 +140,17 @@ See also **`PROJECT_OVERVIEW.md` § Implementation wiki.**
 
 These steps close the strongest gaps versus §2 and §10 (Definition of Done), in pragmatic order:
 
-1. **Workflow mapping enforcement UX hardening (Phase 4)** — API rule is enforced; tighten UX copy/states across analytics consumers so the rule stays obvious everywhere.
+1. **Workflow mapping enforcement UX (Phase 4)** — **Primary gap closed:** stable **`analytics_mappings_incomplete`** code on 403, shared **mapping-blocked callout**, **`api()`** `apiErrorCode`, localized onboarding + dashboard metric labels. Optional follow-ups: per-connection wizard hints when `setup_status !== ready` without noisy banners everywhere.
 2. **Impact parity (§6 notes + Phase 9)** — Core flows shipped (baseline, comparison, history, trends, commentary, pilot **weekly** snapshots). **Next for MVP polish:** tighter “before / after” cards and a clear pilot value narrative—not infrastructure churn.
 3. **Metrics & Attention completeness (Phases 6–7)** — Expand metrics API toward full Lead/Cycle/WIP/threshold coverage; align Attention thresholds with §5 weighting/spec.
 4. **Dashboard UX depth (Phase 8)** — Bottleneck / time-in-status views, filters, weekly narrative strips where the MVP story needs them.
 5. **§3.1 i18n quality gate** — Script or CI check for missing `ru`/`en` keys; purge remaining stray literals outside localized surfaces.
-6. **Pilot readiness (Phase 10)** — When mapping UX (1), Impact/card polish (2), and the minimum narrative (2–4 as needed for your pilot) feel ready, execute `docs/PILOT_RUNBOOK.md`, intervention logging, exit review.
+6. **Pilot readiness (Phase 10)** — When Impact/card polish (2) and minimum dashboard narrative (3–4 as needed) feel ready, execute `docs/PILOT_RUNBOOK.md`, intervention logging, exit review.
 7. **AI capability rollout on new foundation (Phase 8.5)** — Keep deterministic context + evidence refs mandatory; add **workspace takeaways**, **impact narrative**, **task description quality** atop `ai_runs`/`ai_outputs` + `/api/ai`.
 
 *(**Post-MVP / scale:** Celery-or-equivalent workers, automated retry tiers, fully durable job queues—explicitly **out of MVP critical path** unless your deployment already demands them.)*
 
-If you must pick **one** next milestone: **workflow mapping UX hardening (1)** so every pilot participant hits trustworthy analytics paths before heavier dashboard polish.
+If you must pick **one** next milestone: **Impact “before/after” polish and pilot narrative (2)** now that mapping-block UX and stable error codes are in place; then deepen **dashboard (4)** or **metrics/attention (3)** for the story you want to tell in pilot.
 
 ## 4) Execution Phases
 
@@ -232,6 +232,7 @@ Normalized categories (MVP):
 Behavior rules:
 
 - No analytics until mapping is confirmed.
+- When analytics are blocked, APIs return **403** with `detail` shaped as **`{ "code": "analytics_mappings_incomplete", "message": "…" }`** so clients do not rely on parsing localized prose alone (`workspace_mapping_gate`).
 - Mapping changes create a new mapping version.
 - Impact comparisons can be segmented by mapping version.
 

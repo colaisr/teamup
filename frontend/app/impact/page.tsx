@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { ImpactTrendCharts, type ImpactHistorySnapshot } from "@/components/impact/ImpactTrendCharts";
+import AnalyticsMappingBlockedCallout from "@/components/analytics/AnalyticsMappingBlockedCallout";
 import { api, explainApiError } from "@/lib/api";
 import { t } from "@/lib/i18n";
-import { isAnalyticsMappingBlockedMessage } from "@/lib/mappingBlocked";
+import { isAnalyticsMappingBlockedError } from "@/lib/mappingBlocked";
 import { useActiveWorkspaceId } from "@/lib/workspace";
 
 type ImpactRow = {
@@ -89,9 +89,8 @@ export default function ImpactPage() {
       setHistoryRows(hist.snapshots);
       setHistorySynced(true);
     } catch (err: unknown) {
-      const msg = explainApiError(err);
-      setError(msg);
-      setMappingBlocked(isAnalyticsMappingBlockedMessage(msg));
+      setError(explainApiError(err));
+      setMappingBlocked(isAnalyticsMappingBlockedError(err));
       setRows([]);
       setHasBaseline(false);
       setCommentary({ improved: [], worsened: [] });
@@ -108,9 +107,8 @@ export default function ImpactPage() {
       await api(`/api/analytics/impact/snapshot/${workspaceId}?snapshot_type=${type}`, { method: "POST" });
       await load();
     } catch (err: unknown) {
-      const msg = explainApiError(err);
-      setError(msg);
-      setMappingBlocked(isAnalyticsMappingBlockedMessage(msg));
+      setError(explainApiError(err));
+      setMappingBlocked(isAnalyticsMappingBlockedError(err));
     }
   }
 
@@ -224,16 +222,8 @@ export default function ImpactPage() {
           )}
         </div>
       ) : null}
-      {error && (
-        <div>
-          <p style={{ color: "#f87171" }}>{error}</p>
-          {mappingBlocked ? (
-            <p className="muted" style={{ marginTop: 8 }}>
-              <Link href="/settings/integrations">{t("nav.settings.integrations")}</Link>
-            </p>
-          ) : null}
-        </div>
-      )}
+      {mappingBlocked ? <AnalyticsMappingBlockedCallout /> : null}
+      {error && !mappingBlocked ? <p style={{ color: "#f87171" }}>{error}</p> : null}
     </div>
   );
 }

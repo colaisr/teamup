@@ -12,6 +12,13 @@ MAPPING_BLOCKED_MESSAGE_RU = (
     "«Интеграции» (каждая связь должна быть в состоянии «Готово» / ready)."
 )
 
+# Stable machine-readable code for API clients (see frontend `mappingBlocked` / `apiErrorCode`).
+ANALYTICS_MAPPINGS_INCOMPLETE_CODE = "analytics_mappings_incomplete"
+
+
+def analytics_mappings_incomplete_detail() -> dict[str, str]:
+    return {"code": ANALYTICS_MAPPINGS_INCOMPLETE_CODE, "message": MAPPING_BLOCKED_MESSAGE_RU}
+
 
 def workspace_clickup_integration_ready(db: Session, workspace_id: str) -> bool:
     """
@@ -61,5 +68,5 @@ def raise_if_workspace_clickup_mappings_incomplete(db: Session, workspace_id: st
     if not workspace_clickup_integration_ready(db, workspace_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=MAPPING_BLOCKED_MESSAGE_RU,
+            detail=analytics_mappings_incomplete_detail(),
         )

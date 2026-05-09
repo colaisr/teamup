@@ -8,11 +8,9 @@ export default function MappingPage() {
     <div className="grid">
       <h1>{t("onboarding.mapping.title")}</h1>
       <div className="card" style={{ display: "grid", gap: 10 }}>
-        <p style={{ margin: 0 }}>
-          Маппинг статусов теперь выполняется внутри мастера подключения на странице интеграций.
-        </p>
+        <p style={{ margin: 0 }}>{t("onboarding.mapping.intro")}</p>
         <Link className="btn" href="/settings/integrations">
-          Перейти к подключениям
+          {t("onboarding.mapping.openIntegrations")}
         </Link>
       </div>
     </div>

@@ -4,28 +4,31 @@ import Link from "next/link";
 import { useState } from "react";
 import { useAiAssistant } from "@/components/ai/AiAssistantContext";
 import AiGeneratedBlock from "@/components/ai/AiGeneratedBlock";
+import AnalyticsMappingBlockedCallout from "@/components/analytics/AnalyticsMappingBlockedCallout";
 import { explainAttentionTask, type AttentionExplainResult } from "@/lib/ai";
 import { explainApiError } from "@/lib/api";
 import { t } from "@/lib/i18n";
-import { isAnalyticsMappingBlockedMessage } from "@/lib/mappingBlocked";
+import { isAnalyticsMappingBlockedError } from "@/lib/mappingBlocked";
 
 export default function AiAssistantPanel() {
   const { open, toggle, close, workspaceId, pagePath } = useAiAssistant();
   const [taskId, setTaskId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [mappingBlocked, setMappingBlocked] = useState(false);
   const [result, setResult] = useState<AttentionExplainResult | null>(null);
 
   const onExplain = async () => {
     if (!workspaceId.trim() || !taskId.trim()) return;
     setBusy(true);
     setError("");
+    setMappingBlocked(false);
     try {
       const data = await explainAttentionTask(workspaceId, taskId);
       setResult(data);
     } catch (e: unknown) {
-      const msg = explainApiError(e);
-      setError(msg);
+      setMappingBlocked(isAnalyticsMappingBlockedError(e));
+      setError(explainApiError(e));
     } finally {
       setBusy(false);
     }
@@ -90,15 +93,9 @@ export default function AiAssistantPanel() {
               {busy ? t("ai.busyShort") : t("ai.explainTask")}
             </button>
           </div>
-          {error ? (
-            <div style={{ display: "grid", gap: 6 }}>
-              <p style={{ color: "#fca5a5", margin: 0 }}>{error}</p>
-              {isAnalyticsMappingBlockedMessage(error) ? (
-                <p className="muted" style={{ margin: 0 }}>
-                  <Link href="/settings/integrations">{t("nav.settings.integrations")}</Link>
-                </p>
-              ) : null}
-            </div>
+          {mappingBlocked ? <AnalyticsMappingBlockedCallout variant="inline" /> : null}
+          {error && !mappingBlocked ? (
+            <p style={{ color: "#fca5a5", margin: 0 }}>{error}</p>
           ) : null}
           {result ? (
             <AiGeneratedBlock
