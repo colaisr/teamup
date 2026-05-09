@@ -6,7 +6,11 @@ from app.deps import get_current_user
 from app.models import InterventionLog, User
 from app.schemas import AttentionTaskOut, InterventionLogCreate, MessageResponse
 from app.services.analytics_engine import compute_attention_rows, compute_metrics_payload
-from app.services.impact_snapshots import latest_snapshot_values, save_metrics_snapshot
+from app.services.impact_snapshots import (
+    latest_snapshot_values,
+    list_impact_snapshot_history,
+    save_metrics_snapshot,
+)
 from app.utils import get_workspace_membership
 from app.workspace_mapping_gate import raise_if_workspace_clickup_mappings_incomplete
 
@@ -66,6 +70,22 @@ def save_snapshot(
     save_metrics_snapshot(db, workspace_id, snapshot_type)
     db.commit()
     return MessageResponse(message=f"Снимок метрик сохранен: {snapshot_type}")
+
+
+@router.get("/impact/history/{workspace_id}")
+def impact_snapshot_history(
+    workspace_id: str,
+    limit: int = 40,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    get_workspace_membership(db, workspace_id, current_user.id)
+    raise_if_workspace_clickup_mappings_incomplete(db, workspace_id)
+    capped = max(1, min(limit, 200))
+    return {
+        "workspace_id": workspace_id,
+        "snapshots": list_impact_snapshot_history(db, workspace_id, limit=capped),
+    }
 
 
 @router.get("/impact/{workspace_id}")

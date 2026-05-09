@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -45,6 +46,56 @@ def has_snapshot(db: Session, workspace_id: str, snapshot_type: str) -> bool:
         .first()
         is not None
     )
+
+
+def list_impact_snapshot_history(
+    db: Session,
+    workspace_id: str,
+    *,
+    limit: int = 40,
+    max_rows: int = 8000,
+) -> list[dict[str, Any]]:
+    """Return recent snapshot batches, newest first. Rows are grouped by type + period + created time (second)."""
+    rows = (
+        db.query(MetricSnapshot)
+        .filter(MetricSnapshot.workspace_id == workspace_id)
+        .order_by(MetricSnapshot.created_at.desc())
+        .limit(max_rows)
+        .all()
+    )
+    groups: dict[tuple[str, datetime, datetime, datetime], dict[str, float]] = {}
+    period_meta: dict[tuple[str, datetime, datetime, datetime], tuple[datetime, datetime, datetime]] = {}
+    for row in rows:
+        raw_ca = row.created_at or datetime.utcnow()
+        ca_bucket = raw_ca.replace(microsecond=0)
+        key = (row.snapshot_type, row.period_start, row.period_end, ca_bucket)
+        if key not in groups:
+            groups[key] = {}
+            period_meta[key] = (row.period_start, row.period_end, raw_ca)
+        try:
+            groups[key][row.metric_name] = float(row.metric_value)
+        except (TypeError, ValueError):
+            continue
+
+    ordered = sorted(
+        groups.keys(),
+        key=lambda k: period_meta[k][2],
+        reverse=True,
+    )
+    out: list[dict[str, Any]] = []
+    for key in ordered[: min(limit, 200)]:
+        st, ps, pe, _ = key
+        _, _, created_at = period_meta[key]
+        out.append(
+            {
+                "snapshot_type": st,
+                "period_start": ps.isoformat() if ps else None,
+                "period_end": pe.isoformat() if pe else None,
+                "created_at": created_at.isoformat() if created_at else None,
+                "metrics": groups[key],
+            }
+        )
+    return out
 
 
 def save_metrics_snapshot(db: Session, workspace_id: str, snapshot_type: str) -> int:

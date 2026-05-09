@@ -26,6 +26,27 @@ type ImpactResponse = {
   };
 };
 
+type ImpactHistorySnapshot = {
+  snapshot_type: string;
+  period_start: string | null;
+  period_end: string | null;
+  created_at: string | null;
+  metrics: Record<string, number>;
+};
+
+type ImpactHistoryResponse = {
+  workspace_id: string;
+  snapshots: ImpactHistorySnapshot[];
+};
+
+const HISTORY_METRIC_ORDER = [
+  "median_lead_time_hours",
+  "median_cycle_time_hours",
+  "rework_rate",
+  "reopen_rate",
+  "task_count",
+] as const;
+
 const IMPACT_METRIC_LABELS: Record<string, string> = {
   median_lead_time_hours: "impact.metric.leadTime",
   median_cycle_time_hours: "impact.metric.cycleTime",
@@ -55,31 +76,25 @@ export default function ImpactPage() {
   const [rows, setRows] = useState<ImpactRow[]>([]);
   const [hasBaseline, setHasBaseline] = useState(false);
   const [commentary, setCommentary] = useState<ImpactResponse["commentary"]>({ improved: [], worsened: [] });
+  const [historyRows, setHistoryRows] = useState<ImpactHistorySnapshot[]>([]);
+  const [historySynced, setHistorySynced] = useState(false);
   const [error, setError] = useState("");
   const [mappingBlocked, setMappingBlocked] = useState(false);
-
-  async function saveSnapshot(type: "baseline" | "current") {
-    if (!workspaceId) return;
-    setError("");
-    setMappingBlocked(false);
-    try {
-      await api(`/api/analytics/impact/snapshot/${workspaceId}?snapshot_type=${type}`, { method: "POST" });
-    } catch (err: unknown) {
-      const msg = explainApiError(err);
-      setError(msg);
-      setMappingBlocked(isAnalyticsMappingBlockedMessage(msg));
-    }
-  }
 
   async function load() {
     if (!workspaceId) return;
     setError("");
     setMappingBlocked(false);
     try {
-      const payload = await api<ImpactResponse>(`/api/analytics/impact/${workspaceId}`);
+      const [payload, hist] = await Promise.all([
+        api<ImpactResponse>(`/api/analytics/impact/${workspaceId}`),
+        api<ImpactHistoryResponse>(`/api/analytics/impact/history/${workspaceId}`),
+      ]);
       setRows(payload.metrics);
       setHasBaseline(payload.has_baseline);
       setCommentary(payload.commentary);
+      setHistoryRows(hist.snapshots);
+      setHistorySynced(true);
     } catch (err: unknown) {
       const msg = explainApiError(err);
       setError(msg);
@@ -87,7 +102,29 @@ export default function ImpactPage() {
       setRows([]);
       setHasBaseline(false);
       setCommentary({ improved: [], worsened: [] });
+      setHistoryRows([]);
+      setHistorySynced(false);
     }
+  }
+
+  async function saveSnapshot(type: "baseline" | "current") {
+    if (!workspaceId) return;
+    setError("");
+    setMappingBlocked(false);
+    try {
+      await api(`/api/analytics/impact/snapshot/${workspaceId}?snapshot_type=${type}`, { method: "POST" });
+      await load();
+    } catch (err: unknown) {
+      const msg = explainApiError(err);
+      setError(msg);
+      setMappingBlocked(isAnalyticsMappingBlockedMessage(msg));
+    }
+  }
+
+  function snapshotTypeLabel(type: string): string {
+    if (type === "baseline") return t("impact.snapshotType.baseline");
+    if (type === "current") return t("impact.snapshotType.current");
+    return type;
   }
 
   return (
@@ -144,6 +181,47 @@ export default function ImpactPage() {
           <p>{t("impact.deltaPct")}: {row.delta_pct === null ? "—" : `${row.delta_pct}%`}</p>
         </div>
       ))}
+      {workspaceId && historySynced ? (
+        <div className="card" style={{ display: "grid", gap: 10 }}>
+          <strong>{t("impact.historyTitle")}</strong>
+          {historyRows.length === 0 ? (
+            <p className="muted" style={{ margin: 0 }}>
+              {t("impact.historyEmpty")}
+            </p>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
+                <thead>
+                  <tr style={{ textAlign: "left", borderBottom: "1px solid rgba(148,163,184,0.35)" }}>
+                    <th style={{ padding: "6px 8px" }}>{t("impact.snapshotAt")}</th>
+                    <th style={{ padding: "6px 8px" }}>{t("impact.snapshotTypeLabel")}</th>
+                    {HISTORY_METRIC_ORDER.map((m) => (
+                      <th key={m} style={{ padding: "6px 8px", whiteSpace: "nowrap" }}>
+                        {metricLabel(m)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {historyRows.map((snap, idx) => (
+                    <tr key={`${snap.created_at ?? ""}-${snap.snapshot_type}-${idx}`} style={{ borderBottom: "1px solid rgba(148,163,184,0.2)" }}>
+                      <td style={{ padding: "6px 8px" }}>
+                        {snap.created_at ? new Date(snap.created_at).toLocaleString() : "—"}
+                      </td>
+                      <td style={{ padding: "6px 8px" }}>{snapshotTypeLabel(snap.snapshot_type)}</td>
+                      {HISTORY_METRIC_ORDER.map((m) => (
+                        <td key={m} style={{ padding: "6px 8px" }}>
+                          {formatMetricValue(m, snap.metrics[m] ?? 0)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : null}
       {error && (
         <div>
           <p style={{ color: "#f87171" }}>{error}</p>
