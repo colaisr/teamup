@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     encryption_key_base64: str = ""
 
     clickup_api_base: str = "https://api.clickup.com/api/v2"
+    clickup_sync_scheduler_enabled: bool = False
+    clickup_sync_interval_minutes: int = 30
+    clickup_sync_initial_delay_seconds: int = 10
     openrouter_api_base: str = "https://openrouter.ai/api/v1"
     openrouter_http_referer: str = "http://localhost:3000"
     openrouter_app_title: str = "TeamUp"

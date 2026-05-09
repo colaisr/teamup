@@ -11,6 +11,7 @@ from app.db_migrate import (
     ensure_user_is_system_admin_column,
 )
 from app.routers import admin_ai, ai, analytics, auth, integrations, tasks, workspaces
+from app.services.clickup_scheduler import start_clickup_sync_scheduler, stop_clickup_sync_scheduler
 
 app = FastAPI(title="TeamUp API", version="0.1.0")
 
@@ -32,6 +33,12 @@ def startup():
     ensure_clickup_multi_connection_schema(engine)
     ensure_tasks_parent_source_task_id_column(engine)
     ensure_tasks_task_type_text(engine)
+    start_clickup_sync_scheduler()
+
+
+@app.on_event("shutdown")
+def shutdown():
+    stop_clickup_sync_scheduler()
 
 
 @app.get("/health")

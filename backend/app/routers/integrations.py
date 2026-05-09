@@ -6,6 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.clickup_client import ClickUpClient, clickup_status_field_label, parse_clickup_ts
+from app.config import settings
 from app.database import get_db
 from app.deps import get_current_user
 from app.models import ClickUpConnection, ClickUpRawEvent, Task, TaskTransition, User, WorkflowMapping
@@ -234,6 +235,17 @@ def _latest_workspace_connection(db: Session, workspace_id: str) -> ClickUpConne
 
 
 def _serialize_connection(conn: ClickUpConnection) -> ClickUpConnectionOut:
+    sync_interval_minutes = max(1, settings.clickup_sync_interval_minutes)
+    sync_stale_after_at = (
+        conn.last_synced_at + timedelta(minutes=sync_interval_minutes * 2)
+        if conn.last_synced_at
+        else None
+    )
+    sync_is_stale = bool(
+        settings.clickup_sync_scheduler_enabled
+        and sync_stale_after_at
+        and datetime.utcnow() > sync_stale_after_at
+    )
     return ClickUpConnectionOut(
         id=conn.id,
         workspace_id=conn.workspace_id,
@@ -248,6 +260,10 @@ def _serialize_connection(conn: ClickUpConnection) -> ClickUpConnectionOut:
         last_synced_at=conn.last_synced_at,
         last_sync_attempt_at=conn.last_sync_attempt_at,
         last_sync_error=conn.last_sync_error,
+        sync_scheduler_enabled=settings.clickup_sync_scheduler_enabled,
+        sync_interval_minutes=sync_interval_minutes,
+        sync_is_stale=sync_is_stale,
+        sync_stale_after_at=sync_stale_after_at,
         created_at=conn.created_at,
         updated_at=conn.updated_at,
     )

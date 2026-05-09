@@ -38,6 +38,10 @@ type Connection = {
   last_synced_at: string | null;
   last_sync_attempt_at: string | null;
   last_sync_error: string | null;
+  sync_scheduler_enabled: boolean;
+  sync_interval_minutes: number | null;
+  sync_is_stale: boolean;
+  sync_stale_after_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -735,6 +739,17 @@ export default function IntegrationsSettingsClient() {
                         ? ` · последняя попытка: ${formatApiUtcAsLocal(c.last_sync_attempt_at)}`
                         : ""}
                     </span>
+                    <span className="muted" style={{ fontSize: 12 }}>
+                      {c.sync_scheduler_enabled
+                        ? t("integrations.schedulerEnabled").replace("{minutes}", String(c.sync_interval_minutes ?? "—"))
+                        : t("integrations.schedulerDisabled")}
+                      {c.sync_stale_after_at ? ` · ${t("integrations.schedulerStaleAfter")}: ${formatApiUtcAsLocal(c.sync_stale_after_at)}` : ""}
+                    </span>
+                    {c.sync_is_stale ? (
+                      <span className="muted" style={{ fontSize: 12, color: "#fb923c" }}>
+                        {t("integrations.syncStaleWarning")}
+                      </span>
+                    ) : null}
                     {c.last_sync_error ? (
                       <span className="muted" style={{ fontSize: 12, color: "#fb923c", whiteSpace: "pre-wrap" }}>
                         {t("integrations.lastSyncError")}: {c.last_sync_error}

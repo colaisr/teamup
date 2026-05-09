@@ -167,6 +167,10 @@ class ClickUpConnectionOut(BaseModel):
     last_synced_at: datetime | None = None
     last_sync_attempt_at: datetime | None = None
     last_sync_error: str | None = None
+    sync_scheduler_enabled: bool = False
+    sync_interval_minutes: int | None = None
+    sync_is_stale: bool = False
+    sync_stale_after_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 

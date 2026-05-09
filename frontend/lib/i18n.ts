@@ -128,6 +128,10 @@ const ru: Dict = {
   "integrations.confirmFullSync":
     "Полная синхронизация загружает задачи за последние ~90 дней и может быть медленнее. Продолжить?",
   "integrations.lastSyncError": "Последняя ошибка синхронизации",
+  "integrations.schedulerEnabled": "Автосинхронизация включена: каждые {minutes} мин.",
+  "integrations.schedulerDisabled": "Автосинхронизация выключена.",
+  "integrations.schedulerStaleAfter": "устареет после",
+  "integrations.syncStaleWarning": "Данные могут быть устаревшими: запустите синхронизацию или проверьте автосинхронизацию.",
   "integrations.gotoMapping": "Маппинг статусов →",
   "integrations.connectionsHeading": "Подключённые интеграции",
   "integrations.emptyState": "Нет подключённых интеграций для этого рабочего пространства.",
@@ -343,6 +347,10 @@ const en: Dict = {
   "integrations.confirmFullSync":
     "Full sync loads tasks from the last ~90 days and may be slower. Continue?",
   "integrations.lastSyncError": "Last sync error",
+  "integrations.schedulerEnabled": "Auto-sync enabled: every {minutes} min.",
+  "integrations.schedulerDisabled": "Auto-sync disabled.",
+  "integrations.schedulerStaleAfter": "stale after",
+  "integrations.syncStaleWarning": "Data may be stale: run sync or check auto-sync.",
   "ai.fabOpen": "AI Assistant",
   "ai.panelTitle": "Assistant",
   "ai.pageLabel": "Page",
