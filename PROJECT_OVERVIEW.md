@@ -286,6 +286,29 @@ Minimum route groups for TeamUp MVP:
 - App: dashboard, attention, impact (main nav); integrations entry when needed (`/settings/integrations`).
 - Settings/Admin: **workspace lifecycle** (create/rename/switch/members/invites) lives under **`/settings/user`** (tab «Рабочие пространства»), not as a duplicate top-level nav item; **`/settings/workspace`** / **`/settings/members`** redirect there; integration settings at **`/settings/integrations`**; system tools at **`/settings/system`** (system admins only).
 
+### 10.1 Page Rework Standard (Product -> UX -> UI)
+
+To keep all app pages consistent while reworking them, use this sequence:
+
+1. **Product intent first (why this page exists):**
+   - Define the primary decision the target persona must make on this screen (for TeamUp MVP: Engineering Manager / Team Lead / Delivery Manager).
+   - Prioritize manager actionability over diagnostics/debug visibility.
+   - Hide infrastructure/internal identifiers by default (UUIDs, raw technical controls) unless they are explicitly needed for an operator workflow.
+2. **UX structure second (how users complete the task fast):**
+   - Auto-load data from active workspace context where possible; avoid mandatory “press load” first.
+   - Organize content into: (a) page purpose + context, (b) key summary signals, (c) filters/search, (d) primary worklist, (e) drilldown details.
+   - Keep advanced controls collapsible so first paint is content-first.
+   - Favor progressive disclosure for complexity (details drawer, expanded filters, hierarchy toggles).
+3. **UI implementation third (visual consistency and comfort):**
+   - Prefer responsive list/card hybrids when a full table forces horizontal scrolling on common laptop widths.
+   - Use color semantics consistently: danger/risk, warning, neutral, success.
+   - Keep important actions visible and lightweight; preserve scanability via chips, labels, and clear sectioning.
+   - Ensure shell usability: sidebar and footer controls must fit viewport height without requiring page scroll to access account/workspace controls.
+4. **Quality gates for each rework:**
+   - Russian-first copy via i18n keys with English fallback.
+   - Lint/build pass after edits.
+   - Validate empty/loading/error states and mobile/laptop behavior.
+
 ## 11) Business and GTM Direction
 
 Go-to-market phases:
@@ -327,7 +350,7 @@ This section tracks **what is implemented in this repository** today. Product vi
   - **Removal:** a user may leave (**`DELETE`** on self unless owner); removing **another** user is **owner-only** (not admin).
   - **Invitations:** **`POST`** create, **`POST .../revoke`**, **`GET`** list — **owner-only**. Unknown emails get a pending token flow; **existing registered users are added immediately** (no pending row) where applicable.
   - **Invite visibility:** **`GET .../invites?pending_only=true`** (pending) vs **`pending_only=false`** (full audit trail with **`pending` / `accepted` / `revoked`** statuses and timestamps).
-- **Shell UX:** authenticated layout — main nav (**dashboard, attention, impact, integrations**); workspace **switcher** in the sidebar footer; workspace **management** opens from the user card (**gear** → **`/settings/user`** → workspaces tab — no separate «Рабочие пространства» item in the main menu). **System admin** (`users.is_system_admin`) sees shield → **`/settings/system`** where implemented.
+- **Shell UX:** authenticated layout — main nav (**dashboard, attention, impact, integrations**); workspace **switcher** in the sidebar footer; workspace **management** opens from the user card (**gear** → **`/settings/user`** → workspaces tab — no separate «Рабочие пространства» item in the main menu). **System admin** (`users.is_system_admin`) sees shield → **`/settings/system`** where implemented. Sidebar now supports **collapse/expand** rail mode and uses a **viewport-safe sticky layout** (`100vh` / `100dvh`, internal nav scroll) so the user card and workspace controls remain reachable without page-level scrolling.
 - **Settings routes:** `/settings/workspace` and `/settings/members` redirect to **`/settings/user?tab=workspaces`**; `/settings/integrations`; onboarding **`/onboarding/clickup`**, **`/onboarding/mapping`**.
 - **CI:** GitHub Actions (`.github/workflows/ci.yml`): backend tests (`pytest`), `compileall`; frontend ESLint and `next build`. Auth-related pages wrap `useSearchParams` usage in **`Suspense`** for Next compatibility.
 
@@ -350,7 +373,7 @@ This section tracks **what is implemented in this repository** today. Product vi
 - **Attention API:** `GET /api/analytics/attention/{workspace_id}` — scored tasks with textual explanations (rule-based v1).
 - **Analytics gate:** metrics/attention/impact and AI attention explain are blocked until workspace ClickUp mappings are fully configured across active connections.
 - **Mapping-block UX:** backend raises **`HTTP 403`** with structured `detail: { code, message }` (`code`: **`analytics_mappings_incomplete`**, see `workspace_mapping_gate.py`); the frontend **`api()`** helper attaches **`apiErrorCode`**; **`AnalyticsMappingBlockedCallout`** (`frontend/components/analytics/`) is shown on **`/dashboard`**, **`/attention`**, **`/impact`**, and the floating **AI assistant** with links to **`/settings/integrations`** and **`/onboarding/mapping`**. Dashboard metric labels on **`/dashboard`** use `t()` keys (`ru` / `en`); onboarding mapping page is fully key-based.
-- **Tasks surface:** new **`/tasks`** page for debug + ops views — list/search/filter, parent/subtask hierarchy (expand/collapse and full-subtree controls), self/subtree attention columns, details slide-over with provider-backed transition timeline; when ClickUp does not expose Time in Status on the current plan, the details panel shows a localized provider-plan limitation message instead of implying a UI/data bug.
+- **Tasks surface:** **`/tasks`** was reworked from a debug-heavy table into a manager-oriented operations workspace: auto-load from active workspace (no editable workspace UUID field), summary KPI strip, collapsible advanced filters, hierarchy-aware responsive task cards (instead of a wide horizontal table), concise chevron expansion for child tasks, and an upgraded details drawer (deterministic insight first, related tasks, timeline, AI explain action). Provider-plan limitation messaging for Time in Status remains localized and explicit.
 - **Impact surface:** **`/impact`** compares current live metrics against the latest saved **baseline** snapshot; imports create the first baseline automatically once active workflow mappings exist. Users can save baseline/current snapshots manually. **History + SVG trends** use stored batches; optional **`IMPACT_WEEKLY_SNAPSHOT_*`** pilot scheduler appends **`weekly`** snapshots for mapped workspaces. **Pilot UX:** localized pilot intro + **narrative line** (steady vs mixed, from improved/worsened counts), improved/worsened **metric strips**, and a **single comparison table** (metric, trend, baseline, current, delta, delta %) with row tinting—replacing stacked per-metric commentary cards. Integrations connection list surfaces when that server flag is enabled.
 - **App surfaces:** **`/dashboard`**, **`/tasks`**, **`/attention`**, **`/impact`** with workspace context; fuller dashboard parity (deep bottleneck cards, rich filters, trend charts) vs §9 MVP wording is **still open**.
 

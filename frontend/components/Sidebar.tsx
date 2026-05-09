@@ -12,7 +12,9 @@ export default function Sidebar() {
             boxSizing: "border-box",
             width: 260,
             flexShrink: 0,
-            minHeight: "100vh",
+            alignSelf: "flex-start",
+            height: "100vh",
+            maxHeight: "100dvh",
             borderRight: "1px solid #1f2937"
           }}
           aria-hidden

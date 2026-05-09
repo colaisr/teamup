@@ -16,9 +16,9 @@ export default function LayoutWrapper({ children }: PropsWithChildren) {
   }
 
   return (
-    <div style={{ display: "flex" }}>
+    <div style={{ display: "flex", alignItems: "flex-start", minHeight: "100vh" }}>
       <Sidebar />
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, minWidth: 0, minHeight: "100vh" }}>
         <Topbar />
         <main style={{ padding: 20 }}>{children}</main>
       </div>
