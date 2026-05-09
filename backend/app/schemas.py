@@ -188,7 +188,10 @@ class AttentionTaskOut(BaseModel):
     title: str
     current_status: str | None = None
     attention_score: float
+    severity: str = "medium"
+    loop_count: int = 0
     reasons: list[str]
+    signals: list[dict] = Field(default_factory=list)
     suggested_action: str | None = None
 
 

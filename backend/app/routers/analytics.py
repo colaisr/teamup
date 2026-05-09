@@ -102,7 +102,7 @@ def impact_compare(
     improved: list[str] = []
     worsened: list[str] = []
     for key, cur_v in curr_map.items():
-        if key == "workspace_id" or isinstance(cur_v, dict):
+        if key == "workspace_id" or isinstance(cur_v, dict) or not isinstance(cur_v, (int, float)):
             continue
         base_v = base_map.get(key, 0.0)
         cur_v = float(cur_v)
