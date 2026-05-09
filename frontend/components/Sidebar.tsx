@@ -15,7 +15,7 @@ export default function Sidebar() {
             alignSelf: "flex-start",
             height: "100vh",
             maxHeight: "100dvh",
-            borderRight: "1px solid #1f2937"
+            borderRight: "1px solid var(--border-strong)"
           }}
           aria-hidden
         />

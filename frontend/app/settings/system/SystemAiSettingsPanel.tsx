@@ -142,9 +142,9 @@ export default function SystemAiSettingsPanel() {
             width: "100%",
             padding: "10px 12px",
             borderRadius: 8,
-            border: "1px solid #334155",
-            background: "#111827",
-            color: "#e5e7eb"
+            border: "1px solid var(--border)",
+            background: "var(--input-bg)",
+            color: "var(--text)"
           }}
         />
       </label>
@@ -168,9 +168,9 @@ export default function SystemAiSettingsPanel() {
             width: "100%",
             padding: "10px 12px",
             borderRadius: 8,
-            border: "1px solid #334155",
-            background: "#111827",
-            color: "#e5e7eb",
+            border: "1px solid var(--border)",
+            background: "var(--input-bg)",
+            color: "var(--text)",
             cursor: busy ? "not-allowed" : "pointer"
           }}
         >
@@ -187,14 +187,14 @@ export default function SystemAiSettingsPanel() {
         type="button"
         className="btn"
         disabled={busy}
-        style={{ justifySelf: "start", background: "#1e40af", borderColor: "#3b82f6" }}
+        style={{ justifySelf: "start", background: "var(--accent-strong)", borderColor: "var(--accent)" }}
         onClick={() => void onSave()}
       >
         {t("common.save")}
       </button>
 
       {message ? (
-        <p style={{ margin: 0, color: "#93c5fd", fontSize: 14 }}>{message}</p>
+        <p style={{ margin: 0, color: "var(--accent)", fontSize: 14 }}>{message}</p>
       ) : null}
       {error ? (
         <p style={{ margin: 0, color: "#fca5a5", fontSize: 14 }}>

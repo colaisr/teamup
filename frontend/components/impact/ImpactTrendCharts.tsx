@@ -95,7 +95,7 @@ function MetricTrendChart({
           y={0}
           width={CHART_W}
           height={CHART_H}
-          fill="rgba(15,23,42,0.35)"
+          fill="color-mix(in srgb, var(--panel-soft) 70%, transparent)"
           rx={6}
         />
         <line
@@ -103,7 +103,7 @@ function MetricTrendChart({
           y1={CHART_H / 2}
           x2={CHART_W - PAD}
           y2={CHART_H / 2}
-          stroke="rgba(148,163,184,0.2)"
+          stroke="color-mix(in srgb, var(--border) 65%, transparent)"
           strokeWidth={1}
         />
         {coords.length > 1 ? (
@@ -117,7 +117,7 @@ function MetricTrendChart({
           />
         ) : null}
         {coords.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r={coords.length === 1 ? 5 : 3.5} fill={color} stroke="#0f172a" strokeWidth={1} />
+          <circle key={i} cx={p.x} cy={p.y} r={coords.length === 1 ? 5 : 3.5} fill={color} stroke="var(--bg)" strokeWidth={1} />
         ))}
       </svg>
       <div

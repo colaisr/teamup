@@ -318,7 +318,7 @@ export default function UserWorkspacesTab() {
                         style={{
                           fontSize: 11,
                           color: "#93c5fd",
-                          border: "1px solid #334155",
+                          border: "1px solid var(--border)",
                           borderRadius: 6,
                           padding: "2px 8px"
                         }}
@@ -372,7 +372,7 @@ export default function UserWorkspacesTab() {
               {expanded && (
                 <div
                   style={{
-                    borderTop: "1px solid #334155",
+                    borderTop: "1px solid var(--border)",
                     paddingTop: 14,
                     display: "grid",
                     gap: 14
@@ -537,7 +537,7 @@ export default function UserWorkspacesTab() {
                               <span>
                                 {inv.email} ({inv.role})
                               </span>
-                              <span style={{ color: "#94a3b8" }}>
+                              <span style={{ color: "var(--muted)" }}>
                                 {inviteStatusLabel(inv.status)} · {inv.created_at.slice(0, 10)}
                                 {inv.accepted_at ? ` · ${inv.accepted_at.slice(0, 10)}` : ""}
                                 {inv.revoked_at ? ` · ${inv.revoked_at.slice(0, 10)}` : ""}
@@ -566,7 +566,7 @@ export default function UserWorkspacesTab() {
       </div>
 
       {message && (
-        <p style={{ margin: 0, color: "#e2e8f0", fontSize: 14 }}>
+        <p style={{ margin: 0, color: "var(--text)", fontSize: 14 }}>
           {message}
         </p>
       )}

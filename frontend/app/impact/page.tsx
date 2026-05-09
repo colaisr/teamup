@@ -61,7 +61,7 @@ function metricLabel(metric: string): string {
 function directionColor(direction: ImpactRow["direction"]): string {
   if (direction === "improved") return "#4ade80";
   if (direction === "worsened") return "#fb7185";
-  return "#94a3b8";
+  return "var(--muted)";
 }
 
 function rowTint(direction: ImpactRow["direction"]): string {
@@ -223,7 +223,7 @@ export default function ImpactPage() {
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.92rem" }}>
               <thead>
-                <tr style={{ textAlign: "left", borderBottom: "1px solid rgba(148,163,184,0.35)" }}>
+                <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border)" }}>
                   <th style={{ padding: "8px 10px" }}>{t("impact.col.metric")}</th>
                   <th style={{ padding: "8px 10px" }}>{t("impact.col.direction")}</th>
                   <th style={{ padding: "8px 10px" }}>{t("impact.baseline")}</th>
@@ -237,7 +237,7 @@ export default function ImpactPage() {
                   <tr
                     key={row.metric}
                     style={{
-                      borderBottom: "1px solid rgba(148,163,184,0.15)",
+                      borderBottom: "1px solid color-mix(in srgb, var(--border) 55%, transparent)",
                       background: rowTint(row.direction),
                     }}
                   >
@@ -267,7 +267,7 @@ export default function ImpactPage() {
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
                 <thead>
-                  <tr style={{ textAlign: "left", borderBottom: "1px solid rgba(148,163,184,0.35)" }}>
+                  <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border)" }}>
                     <th style={{ padding: "6px 8px" }}>{t("impact.snapshotAt")}</th>
                     <th style={{ padding: "6px 8px" }}>{t("impact.snapshotTypeLabel")}</th>
                     {HISTORY_METRIC_ORDER.map((m) => (
@@ -281,7 +281,7 @@ export default function ImpactPage() {
                   {historyRows.map((snap, idx) => (
                     <tr
                       key={`${snap.created_at ?? ""}-${snap.snapshot_type}-${idx}`}
-                      style={{ borderBottom: "1px solid rgba(148,163,184,0.2)" }}
+                      style={{ borderBottom: "1px solid color-mix(in srgb, var(--border) 70%, transparent)" }}
                     >
                       <td style={{ padding: "6px 8px" }}>
                         {snap.created_at ? new Date(snap.created_at).toLocaleString() : "—"}
@@ -301,7 +301,7 @@ export default function ImpactPage() {
         </div>
       ) : null}
       {mappingBlocked ? <AnalyticsMappingBlockedCallout /> : null}
-      {error && !mappingBlocked ? <p style={{ color: "#f87171" }}>{error}</p> : null}
+      {error && !mappingBlocked ? <p style={{ color: "#ef4444" }}>{error}</p> : null}
     </div>
   );
 }

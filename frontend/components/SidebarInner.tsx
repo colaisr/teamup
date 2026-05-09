@@ -289,9 +289,9 @@ export default function SidebarInner() {
     display: "grid",
     placeItems: "center",
     borderRadius: 8,
-    border: "1px solid #334155",
-    background: "rgba(15,23,42,0.6)",
-    color: "#cbd5e1",
+    border: "1px solid var(--border)",
+    background: "var(--panel-soft)",
+    color: "var(--text)",
     cursor: "pointer",
     flexShrink: 0
   };
@@ -308,13 +308,13 @@ export default function SidebarInner() {
         position: "sticky",
         top: 0,
         overflow: "hidden",
-        borderRight: "1px solid #1f2937",
+        borderRight: "1px solid var(--border-strong)",
         padding: collapsed ? "12px 8px" : "16px",
         display: "flex",
         flexDirection: "column",
         gap: collapsed ? 10 : 16,
         transition: "width 160ms ease",
-        background: "#0f172a"
+        background: "var(--bg)"
       }}
     >
       <div
@@ -368,8 +368,8 @@ export default function SidebarInner() {
                 justifyContent: collapsed ? "center" : "flex-start",
                 padding: collapsed ? "10px 0" : "8px 10px",
                 borderRadius: 8,
-                background: active ? "#1f2937" : "transparent",
-                color: "#e5e7eb",
+                background: active ? "var(--nav-active)" : "transparent",
+                color: "var(--text)",
                 outline: active ? undefined : undefined
               }}
             >
@@ -385,7 +385,7 @@ export default function SidebarInner() {
       <div
         style={{
           flexShrink: 0,
-          borderTop: "1px solid #334155",
+          borderTop: "1px solid var(--border)",
           paddingTop: 14,
           display: "grid",
           gap: collapsed ? 8 : 10,
@@ -397,10 +397,10 @@ export default function SidebarInner() {
         {!collapsed ? (
           <div
             style={{
-              border: "1px solid #334155",
+              border: "1px solid var(--border)",
               borderRadius: 10,
               padding: "10px 10px",
-              background: "#0b1220",
+              background: "var(--panel-soft)",
               width: "100%",
               minWidth: 0,
               maxWidth: "100%",
@@ -414,7 +414,7 @@ export default function SidebarInner() {
                   width: 38,
                   height: 38,
                   borderRadius: "50%",
-                  background: "#1d4ed8",
+                  background: "var(--accent)",
                   display: "grid",
                   placeItems: "center",
                   fontSize: 13,
@@ -442,7 +442,7 @@ export default function SidebarInner() {
                 <div
                   style={{
                     fontSize: 11,
-                    color: "#94a3b8",
+                    color: "var(--muted)",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap"
@@ -467,15 +467,15 @@ export default function SidebarInner() {
                       borderRadius: 8,
                       color:
                         pathname === "/settings/system" || pathname.startsWith("/settings/system/")
-                          ? "#93c5fd"
-                          : "#94a3b8",
+                          ? "var(--accent)"
+                          : "var(--muted)",
                       background:
                         pathname === "/settings/system" || pathname.startsWith("/settings/system/")
                           ? "rgba(59,130,246,0.15)"
                           : "transparent",
                       border:
                         pathname === "/settings/system" || pathname.startsWith("/settings/system/")
-                          ? "1px solid #334155"
+                          ? "1px solid var(--border)"
                           : "1px solid transparent"
                     }}
                   >
@@ -494,9 +494,9 @@ export default function SidebarInner() {
                     width: 36,
                     height: 36,
                     borderRadius: 8,
-                    color: pathname.startsWith("/settings/user") ? "#93c5fd" : "#94a3b8",
+                    color: pathname.startsWith("/settings/user") ? "var(--accent)" : "var(--muted)",
                     background: pathname.startsWith("/settings/user") ? "rgba(59,130,246,0.15)" : "transparent",
-                    border: pathname.startsWith("/settings/user") ? "1px solid #334155" : "1px solid transparent"
+                    border: pathname.startsWith("/settings/user") ? "1px solid var(--border)" : "1px solid transparent"
                   }}
                 >
                   <GearIcon />
@@ -514,7 +514,7 @@ export default function SidebarInner() {
                 width: 40,
                 height: 40,
                 borderRadius: "50%",
-                background: "#1d4ed8",
+                background: "var(--accent)",
                 display: "grid",
                 placeItems: "center",
                 fontSize: 12,
@@ -544,7 +544,7 @@ export default function SidebarInner() {
 
         {!collapsed ? (
           <div style={{ minWidth: 0, width: "100%" }}>
-            <label style={{ fontSize: 12, color: "#94a3b8", display: "block", marginBottom: 6 }}>
+            <label style={{ fontSize: 12, color: "var(--muted)", display: "block", marginBottom: 6 }}>
               {t("sidebar.workspaceSwitch")}
             </label>
             <select
@@ -553,9 +553,9 @@ export default function SidebarInner() {
               disabled={!workspaces.length}
               style={{
                 width: "100%",
-                background: "#0b1220",
-                color: "#e2e8f0",
-                border: "1px solid #334155",
+                background: "var(--panel-soft)",
+                color: "var(--text)",
+                border: "1px solid var(--border)",
                 borderRadius: 8,
                 padding: "8px 10px"
               }}

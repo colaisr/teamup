@@ -55,9 +55,9 @@ export default function AiAssistantPanel() {
             maxHeight: "70vh",
             overflow: "auto",
             zIndex: 10031,
-            border: "1px solid #334155",
+            border: "1px solid var(--border)",
             borderRadius: 12,
-            background: "#0b1220",
+            background: "var(--panel-soft)",
             padding: 14,
             display: "grid",
             gap: 12,
@@ -84,9 +84,9 @@ export default function AiAssistantPanel() {
                 width: "100%",
                 padding: "8px 10px",
                 borderRadius: 8,
-                border: "1px solid #334155",
-                background: "#111827",
-                color: "#e5e7eb",
+                border: "1px solid var(--border)",
+                background: "var(--panel)",
+                color: "var(--text)",
               }}
             />
             <button type="button" className="btn" disabled={busy} onClick={() => void onExplain()}>

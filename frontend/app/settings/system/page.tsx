@@ -68,9 +68,10 @@ export default function SystemSettingsPage() {
             aria-selected={tab === item.id}
             className="btn"
             style={{
-              background: tab === item.id ? "#1e40af" : "#1f2937",
+              background: tab === item.id ? "var(--accent-strong)" : "var(--panel-soft)",
               opacity: tab === item.id ? 1 : 0.85,
-              border: tab === item.id ? "1px solid #3b82f6" : "1px solid #334155"
+              border: tab === item.id ? "1px solid var(--accent)" : "1px solid var(--border)",
+              color: tab === item.id ? "#fff" : "var(--text)"
             }}
             onClick={() => setTab(item.id)}
           >
@@ -82,11 +83,11 @@ export default function SystemSettingsPage() {
       <div
         role="tabpanel"
         style={{
-          border: "1px solid #334155",
+          border: "1px solid var(--border)",
           borderRadius: 12,
           padding: 20,
           minHeight: 200,
-          background: "#0b1220"
+          background: "var(--panel-soft)"
         }}
       >
         {tab === "ai" ? (

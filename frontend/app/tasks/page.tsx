@@ -130,17 +130,29 @@ function buildVisibleRows(items: TaskListItem[], expandedIds: Set<string>): Visi
 
 function statusChipStyle(status: string | null): { bg: string; border: string; color: string } {
   const s = (status || "").toLowerCase();
-  if (s.includes("blocked")) return { bg: "rgba(251,113,133,0.15)", border: "#9f1239", color: "#fecdd3" };
-  if (s.includes("done") || s.includes("cancel")) return { bg: "rgba(74,222,128,0.15)", border: "#166534", color: "#bbf7d0" };
-  if (s.includes("progress")) return { bg: "rgba(96,165,250,0.15)", border: "#1d4ed8", color: "#bfdbfe" };
-  if (s.includes("review") || s.includes("qa")) return { bg: "rgba(250,204,21,0.15)", border: "#854d0e", color: "#fde68a" };
-  return { bg: "rgba(148,163,184,0.15)", border: "#334155", color: "#cbd5e1" };
+  if (s.includes("blocked")) {
+    return { bg: "var(--tone-danger-bg)", border: "var(--tone-danger-border)", color: "var(--tone-danger-text)" };
+  }
+  if (s.includes("done") || s.includes("cancel")) {
+    return { bg: "var(--tone-success-bg)", border: "var(--tone-success-border)", color: "var(--tone-success-text)" };
+  }
+  if (s.includes("progress")) {
+    return { bg: "var(--tone-info-bg)", border: "var(--tone-info-border)", color: "var(--tone-info-text)" };
+  }
+  if (s.includes("review") || s.includes("qa")) {
+    return { bg: "var(--tone-warning-bg)", border: "var(--tone-warning-border)", color: "var(--tone-warning-text)" };
+  }
+  return { bg: "var(--tone-neutral-bg)", border: "var(--tone-neutral-border)", color: "var(--tone-neutral-text)" };
 }
 
 function attentionTone(score: number): { bg: string; color: string; border: string } {
-  if (score >= 0.75) return { bg: "rgba(251,113,133,0.15)", color: "#fecdd3", border: "#be123c" };
-  if (score > 0) return { bg: "rgba(250,204,21,0.15)", color: "#fde68a", border: "#a16207" };
-  return { bg: "rgba(148,163,184,0.12)", color: "#cbd5e1", border: "#475569" };
+  if (score >= 0.75) {
+    return { bg: "var(--tone-danger-bg)", color: "var(--tone-danger-text)", border: "var(--tone-danger-border)" };
+  }
+  if (score > 0) {
+    return { bg: "var(--tone-warning-bg)", color: "var(--tone-warning-text)", border: "var(--tone-warning-border)" };
+  }
+  return { bg: "var(--tone-neutral-bg)", color: "var(--tone-neutral-text)", border: "var(--tone-neutral-border)" };
 }
 
 function ChevronIcon({ expanded }: { expanded: boolean }) {
@@ -425,14 +437,14 @@ export default function TasksPage() {
             width: "fit-content",
             padding: "6px 10px",
             borderRadius: 999,
-            border: "1px solid #334155",
-            background: "#0b1220",
-            color: "#cbd5e1",
+            border: "1px solid var(--border)",
+            background: "var(--panel-soft)",
+            color: "var(--text)",
             fontSize: 13,
           }}
         >
           <span>{t("tasks.workspaceLabel")}:</span>
-          <strong style={{ color: "#e2e8f0", fontWeight: 600 }}>{workspaceName || t("tasks.workspaceUnknown")}</strong>
+          <strong style={{ color: "var(--text)", fontWeight: 600 }}>{workspaceName || t("tasks.workspaceUnknown")}</strong>
         </div>
       </div>
 
@@ -466,7 +478,11 @@ export default function TasksPage() {
               { key: "tasks.summary.unassigned", value: summary.unassigned },
               { key: "tasks.summary.activeTrees", value: summary.activeTrees },
             ].map((item) => (
-              <div key={item.key} className="card" style={{ padding: 12, display: "grid", gap: 4 }}>
+              <div
+                key={item.key}
+                className="card"
+                style={{ padding: 12, display: "grid", gap: 4, background: "var(--panel-soft)", border: "1px solid var(--border)" }}
+              >
                 <span className="muted" style={{ fontSize: 12 }}>
                   {t(item.key)}
                 </span>
@@ -490,7 +506,7 @@ export default function TasksPage() {
                   gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
                   gap: 10,
                   paddingTop: 10,
-                  borderTop: "1px solid #1f2937",
+                  borderTop: "1px solid var(--border-strong)",
                 }}
               >
                 <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
@@ -569,10 +585,11 @@ export default function TasksPage() {
                         gap: 10,
                         padding: "12px 12px 12px 10px",
                         marginLeft: Math.min(depth * 18, 72),
-                        border: "1px solid #1f2937",
-                        borderLeft: depth > 0 ? "3px solid #334155" : "1px solid #1f2937",
+                        border: "1px solid var(--border)",
+                        borderLeft: depth > 0 ? "3px solid var(--border-strong)" : "1px solid var(--border)",
                         borderRadius: 12,
-                        background: depth > 0 ? "rgba(15,23,42,0.68)" : "#0b1220",
+                        background: depth > 0 ? "var(--panel-soft)" : "var(--panel)",
+                        boxShadow: "0 1px 0 color-mix(in srgb, var(--border-strong) 30%, transparent)",
                       }}
                     >
                       <div style={{ display: "flex", gap: 10, alignItems: "flex-start", minWidth: 0 }}>
@@ -589,10 +606,10 @@ export default function TasksPage() {
                             flexShrink: 0,
                             display: "grid",
                             placeItems: "center",
-                            border: row.child_count > 0 ? "1px solid #334155" : "1px solid transparent",
+                            border: row.child_count > 0 ? "1px solid var(--border)" : "1px solid transparent",
                             borderRadius: 8,
-                            background: row.child_count > 0 ? "rgba(15,23,42,0.9)" : "transparent",
-                            color: row.child_count > 0 ? "#cbd5e1" : "transparent",
+                            background: row.child_count > 0 ? "var(--panel-soft)" : "transparent",
+                            color: row.child_count > 0 ? "var(--text)" : "transparent",
                             cursor: row.child_count > 0 ? "pointer" : "default",
                           }}
                         >
@@ -608,9 +625,9 @@ export default function TasksPage() {
                                   borderRadius: 999,
                                   padding: "2px 8px",
                                   fontSize: 11,
-                                  border: "1px solid #334155",
-                                  color: "#cbd5e1",
-                                  background: "rgba(148,163,184,0.12)",
+                                  border: "1px solid var(--tone-neutral-border)",
+                                  color: "var(--tone-neutral-text)",
+                                  background: "var(--tone-neutral-bg)",
                                 }}
                               >
                                 {t("tasks.subtaskBadge")}
@@ -671,9 +688,9 @@ export default function TasksPage() {
                               style={{
                                 display: "inline-block",
                                 borderRadius: 999,
-                                border: "1px solid #7c2d12",
-                                background: "rgba(251,146,60,0.14)",
-                                color: "#fdba74",
+                                border: "1px solid var(--tone-unassigned-border)",
+                                background: "var(--tone-unassigned-bg)",
+                                color: "var(--tone-unassigned-text)",
                                 padding: "3px 10px",
                                 fontSize: 12,
                               }}
@@ -722,19 +739,30 @@ export default function TasksPage() {
                             style={{
                               display: "inline-block",
                               borderRadius: 999,
-                              border: "1px solid #334155",
+                              border:
+                                dueBucket === "overdue"
+                                  ? "1px solid var(--tone-danger-border)"
+                                  : dueBucket === "dueSoon"
+                                    ? "1px solid var(--tone-warning-border)"
+                                    : dueBucket === "completed"
+                                      ? "1px solid var(--tone-success-border)"
+                                      : "1px solid var(--tone-neutral-border)",
                               background:
                                 dueBucket === "overdue"
-                                  ? "rgba(251,113,133,0.14)"
+                                  ? "var(--tone-danger-bg)"
                                   : dueBucket === "dueSoon"
-                                    ? "rgba(250,204,21,0.14)"
-                                    : "rgba(148,163,184,0.1)",
+                                    ? "var(--tone-warning-bg)"
+                                    : dueBucket === "completed"
+                                      ? "var(--tone-success-bg)"
+                                      : "var(--tone-neutral-bg)",
                               color:
                                 dueBucket === "overdue"
-                                  ? "#fecdd3"
+                                  ? "var(--tone-danger-text)"
                                   : dueBucket === "dueSoon"
-                                    ? "#fde68a"
-                                    : "#cbd5e1",
+                                    ? "var(--tone-warning-text)"
+                                    : dueBucket === "completed"
+                                      ? "var(--tone-success-text)"
+                                      : "var(--tone-neutral-text)",
                               padding: "3px 10px",
                               fontSize: 12,
                             }}
@@ -764,7 +792,7 @@ export default function TasksPage() {
             style={{
               position: "fixed",
               inset: 0,
-              background: "rgba(2,6,23,0.55)",
+              background: "color-mix(in srgb, var(--bg) 65%, transparent)",
               zIndex: 50,
             }}
           />
@@ -776,8 +804,8 @@ export default function TasksPage() {
               top: 0,
               bottom: 0,
               width: "min(680px, 96vw)",
-              background: "#020817",
-              borderLeft: "1px solid #334155",
+              background: "var(--bg)",
+              borderLeft: "1px solid var(--border)",
               zIndex: 60,
               overflowY: "auto",
               padding: 16,
@@ -929,7 +957,7 @@ export default function TasksPage() {
         </>
       )}
 
-      {error ? <p style={{ color: "#f87171" }}>{error}</p> : null}
+      {error ? <p style={{ color: "#ef4444" }}>{error}</p> : null}
     </div>
   );
 }

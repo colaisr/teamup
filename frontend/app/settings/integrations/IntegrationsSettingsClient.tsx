@@ -96,8 +96,8 @@ function panelStyle(): CSSProperties {
     width: "min(780px, 100%)",
     maxHeight: "min(92vh, 740px)",
     overflow: "auto",
-    background: "#0f172a",
-    border: "1px solid #334155",
+    background: "var(--panel-soft)",
+    border: "1px solid var(--border)",
     borderRadius: 12,
     padding: "20px 22px",
     boxShadow: "0 24px 80px rgba(0,0,0,.35)"
@@ -543,7 +543,7 @@ export default function IntegrationsSettingsClient() {
                   : t("integrations.wizard.stepDone")}
         </p>
 
-        {wizardHint ? <p style={{ margin: "0 0 14px 0", fontSize: 13, color: "#e2e8f0", whiteSpace: "pre-wrap" }}>{wizardHint}</p> : null}
+        {wizardHint ? <p style={{ margin: "0 0 14px 0", fontSize: 13, color: "var(--text)", whiteSpace: "pre-wrap" }}>{wizardHint}</p> : null}
 
         {wizardStep === 0 ? (
           <div style={{ display: "grid", gap: 10 }}>
@@ -573,10 +573,10 @@ export default function IntegrationsSettingsClient() {
                   fontFamily: "monospace",
                   fontSize: 13,
                   padding: "10px 12px",
-                  background: "#0f172a",
-                  border: "1px solid #334155",
+                  background: "var(--panel-soft)",
+                  border: "1px solid var(--border)",
                   borderRadius: 8,
-                  color: "#e5e7eb"
+                  color: "var(--text)"
                 }}
               />
             ) : (
@@ -820,7 +820,7 @@ export default function IntegrationsSettingsClient() {
           </div>
         )}
 
-        {pageMessage ? <p style={{ margin: 0, color: "#e2e8f0", fontSize: 14 }}>{pageMessage}</p> : null}
+        {pageMessage ? <p style={{ margin: 0, color: "var(--text)", fontSize: 14 }}>{pageMessage}</p> : null}
       </div>
       {documentReady && modalOpen ? createPortal(wizardModal, document.body) : null}
     </>

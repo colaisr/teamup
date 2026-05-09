@@ -301,6 +301,10 @@ const ru: Dict = {
   "settings.user.tab.details": "Данные пользователя",
   "settings.user.tab.notifications": "Уведомления",
   "settings.user.tab.workspaces": "Рабочие пространства",
+  "settings.user.theme.title": "Тема интерфейса",
+  "settings.user.theme.intro": "Выберите светлую или тёмную тему. Выбор применяется ко всему приложению и сохраняется для следующих визитов.",
+  "settings.user.theme.dark": "Тёмная",
+  "settings.user.theme.light": "Светлая",
   "settings.user.placeholder.details": "Раздел «Данные пользователя» будет добавлен позже.",
   "settings.user.placeholder.notifications": "Раздел «Уведомления» будет добавлен позже.",
   "settings.user.workspaces.intro":
@@ -422,6 +426,17 @@ const en: Dict = {
   "onboarding.mapping.intro":
     "Mapping is done inside the ClickUp connection wizard on the integrations page: open a connection, pick scope, then save mappings to normalized workflow stages.",
   "onboarding.mapping.openIntegrations": "Go to integrations",
+  "settings.user.title": "User settings",
+  "settings.user.tab.details": "User details",
+  "settings.user.tab.notifications": "Notifications",
+  "settings.user.tab.workspaces": "Workspaces",
+  "settings.user.theme.title": "Theme",
+  "settings.user.theme.intro":
+    "Choose light or dark theme. The selection applies across the app and is saved for future visits.",
+  "settings.user.theme.dark": "Dark",
+  "settings.user.theme.light": "Light",
+  "settings.user.placeholder.details": "User details section will be added later.",
+  "settings.user.placeholder.notifications": "Notifications section will be added later.",
   "tasks.title": "All tasks",
   "tasks.hint":
     "Operational task workspace: statuses, ownership, attention risk, and related subtasks in one view.",

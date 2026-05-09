@@ -18,7 +18,7 @@ export default function AiGeneratedBlock({
   evidenceRefs,
 }: Props) {
   return (
-    <div className="card" style={{ display: "grid", gap: 8, background: "#0f172a" }}>
+    <div className="card" style={{ display: "grid", gap: 8, background: "var(--panel-soft)" }}>
       <p style={{ margin: 0, fontWeight: 600 }}>{t("ai.blockHeading")}</p>
       <p style={{ margin: 0 }}>{summary}</p>
       {takeaways.length > 0 ? (
