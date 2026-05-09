@@ -12,6 +12,24 @@ from app.workspace_mapping_gate import raise_if_workspace_clickup_mappings_incom
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 
+LOWER_IS_BETTER = {
+    "median_lead_time_hours",
+    "median_cycle_time_hours",
+    "rework_rate",
+    "reopen_rate",
+}
+NEUTRAL_METRICS = {"task_count"}
+
+
+def _impact_direction(metric: str, delta: float) -> str:
+    if abs(delta) < 0.0001:
+        return "neutral"
+    if metric in NEUTRAL_METRICS:
+        return "neutral"
+    if metric in LOWER_IS_BETTER:
+        return "improved" if delta < 0 else "worsened"
+    return "improved" if delta > 0 else "worsened"
+
 
 @router.get("/metrics/{workspace_id}")
 def compute_metrics(
@@ -61,6 +79,8 @@ def impact_compare(
     base_map = latest_snapshot_values(db, workspace_id, "baseline")
     curr_map = compute_metrics_payload(db, workspace_id)
     metrics = []
+    improved: list[str] = []
+    worsened: list[str] = []
     for key, cur_v in curr_map.items():
         if key == "workspace_id" or isinstance(cur_v, dict):
             continue
@@ -68,6 +88,11 @@ def impact_compare(
         cur_v = float(cur_v)
         delta = round(cur_v - base_v, 4)
         delta_pct = round((delta / base_v) * 100, 2) if base_v else None
+        direction = _impact_direction(key, delta)
+        if direction == "improved":
+            improved.append(key)
+        elif direction == "worsened":
+            worsened.append(key)
         metrics.append(
             {
                 "metric": key,
@@ -75,12 +100,17 @@ def impact_compare(
                 "current": cur_v,
                 "delta": delta,
                 "delta_pct": delta_pct,
+                "direction": direction,
             }
         )
     return {
         "workspace_id": workspace_id,
         "has_baseline": bool(base_map),
         "metrics": metrics,
+        "commentary": {
+            "improved": improved,
+            "worsened": worsened,
+        },
     }
 
 

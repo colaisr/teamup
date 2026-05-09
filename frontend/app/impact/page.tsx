@@ -13,12 +13,17 @@ type ImpactRow = {
   current: number;
   delta: number;
   delta_pct: number | null;
+  direction: "improved" | "worsened" | "neutral";
 };
 
 type ImpactResponse = {
   workspace_id: string;
   has_baseline: boolean;
   metrics: ImpactRow[];
+  commentary: {
+    improved: string[];
+    worsened: string[];
+  };
 };
 
 const IMPACT_METRIC_LABELS: Record<string, string> = {
@@ -35,10 +40,21 @@ function formatMetricValue(metric: string, value: number): string {
   return String(Math.round(value));
 }
 
+function metricLabel(metric: string): string {
+  return t(IMPACT_METRIC_LABELS[metric] || metric);
+}
+
+function directionColor(direction: ImpactRow["direction"]): string {
+  if (direction === "improved") return "#4ade80";
+  if (direction === "worsened") return "#fb7185";
+  return "#94a3b8";
+}
+
 export default function ImpactPage() {
   const [workspaceId, setWorkspaceId] = useActiveWorkspaceId("");
   const [rows, setRows] = useState<ImpactRow[]>([]);
   const [hasBaseline, setHasBaseline] = useState(false);
+  const [commentary, setCommentary] = useState<ImpactResponse["commentary"]>({ improved: [], worsened: [] });
   const [error, setError] = useState("");
   const [mappingBlocked, setMappingBlocked] = useState(false);
 
@@ -63,12 +79,14 @@ export default function ImpactPage() {
       const payload = await api<ImpactResponse>(`/api/analytics/impact/${workspaceId}`);
       setRows(payload.metrics);
       setHasBaseline(payload.has_baseline);
+      setCommentary(payload.commentary);
     } catch (err: unknown) {
       const msg = explainApiError(err);
       setError(msg);
       setMappingBlocked(isAnalyticsMappingBlockedMessage(msg));
       setRows([]);
       setHasBaseline(false);
+      setCommentary({ improved: [], worsened: [] });
     }
   }
 
@@ -97,9 +115,29 @@ export default function ImpactPage() {
           {t("impact.noBaseline")}
         </p>
       ) : null}
+      {hasBaseline && rows.length > 0 ? (
+        <div className="card" style={{ display: "grid", gap: 8 }}>
+          <strong>{t("impact.commentaryTitle")}</strong>
+          <p className="muted" style={{ margin: 0 }}>
+            {commentary.improved.length > 0
+              ? `${t("impact.improved")}: ${commentary.improved.map(metricLabel).join(", ")}`
+              : t("impact.noImproved")}
+          </p>
+          <p className="muted" style={{ margin: 0 }}>
+            {commentary.worsened.length > 0
+              ? `${t("impact.worsened")}: ${commentary.worsened.map(metricLabel).join(", ")}`
+              : t("impact.noWorsened")}
+          </p>
+        </div>
+      ) : null}
       {rows.map((row) => (
         <div key={row.metric} className="card">
-          <strong>{t(IMPACT_METRIC_LABELS[row.metric] || row.metric)}</strong>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+            <strong>{metricLabel(row.metric)}</strong>
+            <span style={{ color: directionColor(row.direction), fontWeight: 700 }}>
+              {t(`impact.direction.${row.direction}`)}
+            </span>
+          </div>
           <p>{t("impact.baseline")}: {formatMetricValue(row.metric, row.baseline)}</p>
           <p>{t("impact.current")}: {formatMetricValue(row.metric, row.current)}</p>
           <p>{t("impact.delta")}: {formatMetricValue(row.metric, row.delta)}</p>
