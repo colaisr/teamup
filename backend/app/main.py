@@ -4,11 +4,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database import Base, engine
 from app.db_migrate import (
     ensure_clickup_connection_clickup_team_id_column,
+    ensure_clickup_connection_sync_observability_columns,
     ensure_clickup_multi_connection_schema,
+    ensure_tasks_parent_source_task_id_column,
     ensure_tasks_task_type_text,
     ensure_user_is_system_admin_column,
 )
-from app.routers import analytics, auth, integrations, workspaces
+from app.routers import admin_ai, ai, analytics, auth, integrations, tasks, workspaces
 
 app = FastAPI(title="TeamUp API", version="0.1.0")
 
@@ -26,7 +28,9 @@ def startup():
     Base.metadata.create_all(bind=engine)
     ensure_user_is_system_admin_column(engine)
     ensure_clickup_connection_clickup_team_id_column(engine)
+    ensure_clickup_connection_sync_observability_columns(engine)
     ensure_clickup_multi_connection_schema(engine)
+    ensure_tasks_parent_source_task_id_column(engine)
     ensure_tasks_task_type_text(engine)
 
 
@@ -39,4 +43,7 @@ app.include_router(auth.router)
 app.include_router(workspaces.router)
 app.include_router(integrations.router)
 app.include_router(analytics.router)
+app.include_router(admin_ai.router)
+app.include_router(ai.router)
+app.include_router(tasks.router)
 

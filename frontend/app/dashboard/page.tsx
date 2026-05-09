@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import Link from "next/link";
+import { useState } from "react";
+import { api, explainApiError } from "@/lib/api";
 import { t } from "@/lib/i18n";
+import { isAnalyticsMappingBlockedMessage } from "@/lib/mappingBlocked";
+import { setActiveWorkspaceId, useActiveWorkspaceId } from "@/lib/workspace";
 
 type Metrics = {
   median_lead_time_hours: number;
@@ -13,23 +16,23 @@ type Metrics = {
 };
 
 export default function DashboardPage() {
-  const [workspaceId, setWorkspaceId] = useState("");
+  const [workspaceId, setWorkspaceId] = useActiveWorkspaceId("");
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    const ws = localStorage.getItem("teamup_workspace_id") || "";
-    setWorkspaceId(ws);
-  }, []);
+  const [mappingBlocked, setMappingBlocked] = useState(false);
 
   async function load() {
     if (!workspaceId) return;
     setError("");
+    setMappingBlocked(false);
     try {
       const data = await api<Metrics>(`/api/analytics/metrics/${workspaceId}`);
       setMetrics(data);
-    } catch (err: any) {
-      setError(err.message || "Failed");
+    } catch (err: unknown) {
+      const msg = explainApiError(err);
+      setError(msg);
+      setMappingBlocked(isAnalyticsMappingBlockedMessage(msg));
+      setMetrics(null);
     }
   }
 
@@ -40,7 +43,7 @@ export default function DashboardPage() {
         <p className="muted">Workspace ID</p>
         <input value={workspaceId} onChange={(e) => setWorkspaceId(e.target.value)} />
         <div style={{ marginTop: 10 }}>
-          <button className="btn" onClick={() => localStorage.setItem("teamup_workspace_id", workspaceId)}>
+          <button className="btn" onClick={() => setActiveWorkspaceId(workspaceId)}>
             {t("common.save")}
           </button>
           <button className="btn" style={{ marginLeft: 8 }} onClick={load}>
@@ -58,7 +61,16 @@ export default function DashboardPage() {
           <div className="card">Tasks: {metrics.task_count}</div>
         </div>
       )}
-      {error && <p style={{ color: "#f87171" }}>{error}</p>}
+      {error && (
+        <div>
+          <p style={{ color: "#f87171" }}>{error}</p>
+          {mappingBlocked ? (
+            <p className="muted" style={{ marginTop: 8 }}>
+              <Link href="/settings/integrations">{t("nav.settings.integrations")}</Link>
+            </p>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }

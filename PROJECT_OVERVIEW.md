@@ -338,18 +338,33 @@ This section tracks **what is implemented in this repository** today. Product vi
 - **API (`/api/integrations/...`):** list/create connections by **`workspace_id`**; **`GET`/`PUT`** connection **credentials** (admin-only; **GET** returns decrypted token so the edit wizard can prefill a masked/saved token); scopes (teams/spaces/lists); scope save; statuses; workflow mapping CRUD; **POST import** per **`connection_id`**. Legacy “latest connection” wrappers remain where noted in code for older clients.
 - **Settings UI (`/settings/integrations`):** **list** of connections with **Синхронизировать / Редактировать / Отключить / Добавить**; full-screen **wizard** (credentials with verify + spinners → team/Space with refresh spinners → **обязательный** status mapping → done). Footer action order puts **«Назад»** left of primary actions. Workspace UUID override card removed (uses **`localStorage` `teamup_workspace_id`** from the sidebar switcher). **Редактировать** prefetch uses explicit team/Space IDs so selects stay populated after reload.
 - **Import:** parses ClickUp **`status`** as string or nested object (**`clickup_status_field_label`**); **`tasks.task_type`** column migrated to **`TEXT`** on PostgreSQL (custom-field JSON longer than VARCHAR(64)); user-facing error detail on failed import commits when possible.
-- **Sync:** Available once a **Space/scope id** exists (completion of status mapping remains required for **`ready`** and best analytics fidelity). Spinner on sync; **`last_synced_at`** displayed in **browser local time** (**`formatApiUtcAsLocal`** assumes naive API timestamps are UTC).
-- **Ingestion:** on-demand historical import (**~90 days** window in current logic); **no** production-grade scheduled incremental Celery/sync loop yet.
+- **Sync:** Available once a **Space/scope id** exists (mapping still required for `ready` and analytics access). Import endpoint accepts **`sync_mode=auto|incremental|full`**; `auto` uses incremental by `date_updated_gt` after last sync (with overlap), otherwise full ~90-day import. Integrations UI exposes **incremental** and **full** actions separately.
+- **Sync observability:** `clickup_connections` now stores **`last_sync_attempt_at`**, **`last_sync_error`**, **`last_synced_at`**; frontend displays last attempt/error, timestamps in **browser local time** via `formatApiUtcAsLocal`.
+- **Ingestion:** on-demand import is hardened and incremental-capable, but **no scheduled/background Celery sync loop yet**.
 
 ### Analytics and product UI (partial)
 
 - **Metrics API:** `GET /api/analytics/metrics/{workspace_id}` — lead/cycle medians, rework/reopen-oriented signals, time-in-status rollup (subset of full MVP metric list); **normalized status mapping respects per-connection workflows** with fallback where `connection_id` is missing on older rows.
 - **Attention API:** `GET /api/analytics/attention/{workspace_id}` — scored tasks with textual explanations (rule-based v1).
-- **App surfaces:** **`/dashboard`**, **`/attention`**, **`/impact`** with workspace context; fuller dashboard parity (deep bottleneck cards, rich filters, trend charts) vs §9 MVP wording is **still open**.
+- **Analytics gate:** metrics/attention/impact and AI attention explain are blocked until workspace ClickUp mappings are fully configured across active connections.
+- **Tasks surface:** new **`/tasks`** page for debug + ops views — list/search/filter, parent/subtask hierarchy (expand/collapse and full-subtree controls), self/subtree attention columns, details slide-over with transition timeline.
+- **App surfaces:** **`/dashboard`**, **`/tasks`**, **`/attention`**, **`/impact`** with workspace context; fuller dashboard parity (deep bottleneck cards, rich filters, trend charts) vs §9 MVP wording is **still open**.
+
+### AI foundation (MVP+ scaffold, partial)
+
+- **System AI settings (`/settings/system`):** dedicated **AI tab** for system admins — store OpenRouter API key, pick default model, refresh model catalog, test provider connection. Backend routes: **`/api/admin/ai/settings`**, **`/api/admin/ai/models/list`**, **`/api/admin/ai/test-connection`**.
+- **Provider abstraction:** `openrouter_client.py` now includes shared provider helpers (model listing, connectivity check, `chat_complete`, model resolution, normalized HTTP error formatting) with config via `OPENROUTER_*` settings.
+- **Platform key/model source of truth:** `ai_platform.py` centralizes access to encrypted provider credentials (`platform_ai_settings`) for server-side AI features.
+- **Deterministic core extraction for reuse:** analytics logic was moved to `services/analytics_engine.py` so APIs and AI context builders consume the same metrics/attention computations.
+- **AI audit trail models:** `ai_runs` + `ai_outputs` added for run metadata and structured outputs (capability id, model, prompt version, status/latency/errors, evidence refs, linked entity ids).
+- **First product AI capability:** workspace endpoint **`POST /api/ai/attention/{workspace_id}/explain-task`** (`attention_task_explanation`) builds deterministic context, calls OpenRouter, returns structured narrative (`summary`, `takeaways`, `recommended_actions`, `limitations`, `evidence_refs`) and persists audit rows.
+- **Subtree-aware explain:** request flag `include_subtasks` extends context to task descendants (rolled-up reasons/score + combined transitions), used from tasks details panel.
+- **Frontend AI shell:** shared scaffolding added (`frontend/components/ai/*`, `frontend/lib/ai.ts`) with a global assistant panel and per-task “Explain with AI” action in `/attention`; generated blocks show takeaways/actions/evidence.
+- **Workspace context plumbing:** shared workspace helper (`frontend/lib/workspace.ts`) introduced so AI panel and analytics pages reuse one active workspace source instead of scattered `localStorage` reads.
 
 ### Gaps versus full MVP wording (§9)
 
-- Incremental scheduled sync, stronger observability/retry narratives, hardened “no analytics until mapping confirmed,” baseline/value automation in Impact, PostgreSQL-heavy CI parity — see [`MVP_IMPLEMENTATION_PLAN.md`](MVP_IMPLEMENTATION_PLAN.md) cross-cutting notes.
+- Scheduled/background sync orchestration (beyond manual sync modes), deeper retry policy/alerts, baseline/value automation in Impact, PostgreSQL-heavy CI parity, and broader MVP+ AI capabilities (task-quality scoring, workspace/impact narratives, full contextual chat sessions) — see [`MVP_IMPLEMENTATION_PLAN.md`](MVP_IMPLEMENTATION_PLAN.md) cross-cutting notes.
 
 ---
 

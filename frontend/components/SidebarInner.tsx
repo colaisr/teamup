@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuthModals } from "@/components/auth/AuthModalsContext";
 import { api, setToken } from "@/lib/api";
 import { t } from "@/lib/i18n";
+import { getActiveWorkspaceId, setActiveWorkspaceId as persistActiveWorkspaceId } from "@/lib/workspace";
 
 type UserMe = {
   id: string;
@@ -82,6 +83,7 @@ function ShieldIcon({ size = 18 }: { size?: number }) {
 
 const baseLinks: NavItem[] = [
   { href: "/dashboard", key: "nav.dashboard" },
+  { href: "/tasks", key: "nav.tasks" },
   { href: "/attention", key: "nav.attention" },
   { href: "/impact", key: "nav.impact" },
   { href: "/settings/integrations", key: "nav.settings.integrations" }
@@ -131,7 +133,7 @@ export default function SidebarInner() {
       return;
     }
     const fromServer = workspaces.find((item) => item.is_current)?.id;
-    const stored = localStorage.getItem("teamup_workspace_id");
+    const stored = getActiveWorkspaceId();
     const hasStored = stored ? workspaces.some((item) => item.id === stored) : false;
     const preferred =
       fromServer ||
@@ -140,7 +142,7 @@ export default function SidebarInner() {
       workspaces[0].id;
     setActiveWorkspaceId(preferred);
     if (preferred !== stored) {
-      localStorage.setItem("teamup_workspace_id", preferred);
+      persistActiveWorkspaceId(preferred);
     }
   }, [workspaces]);
 
@@ -159,13 +161,13 @@ export default function SidebarInner() {
   async function handleWorkspaceSwitch(nextWorkspaceId: string) {
     await api<unknown>(`/api/workspaces/${nextWorkspaceId}/switch`, { method: "POST" });
     setActiveWorkspaceId(nextWorkspaceId);
-    localStorage.setItem("teamup_workspace_id", nextWorkspaceId);
+    persistActiveWorkspaceId(nextWorkspaceId);
     window.location.reload();
   }
 
   function handleLogout() {
     setToken(null);
-    localStorage.removeItem("teamup_workspace_id");
+    persistActiveWorkspaceId("");
     openLogin();
     router.push("/", { scroll: false });
   }

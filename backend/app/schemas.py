@@ -165,6 +165,8 @@ class ClickUpConnectionOut(BaseModel):
     scope_name: str | None = None
     clickup_team_id: str | None = None
     last_synced_at: datetime | None = None
+    last_sync_attempt_at: datetime | None = None
+    last_sync_error: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -183,8 +185,106 @@ class AttentionTaskOut(BaseModel):
     suggested_action: str | None = None
 
 
+class TaskListItemOut(BaseModel):
+    source_task_id: str
+    parent_source_task_id: str | None = None
+    title: str
+    current_status: str | None = None
+    normalized_status: str | None = None
+    assignee_email: str | None = None
+    created_at_source: datetime | None = None
+    due_at_source: datetime | None = None
+    completed_at_source: datetime | None = None
+    updated_at_source: datetime | None = None
+    last_synced_at: datetime
+    connection_id: str | None = None
+    self_attention_score: float = 0.0
+    subtree_attention_score: float = 0.0
+    attention_reasons: list[str] = Field(default_factory=list)
+    child_count: int = 0
+    descendant_count: int = 0
+    open_descendant_count: int = 0
+    is_subtask: bool = False
+    parent_title: str | None = None
+
+
+class TaskListResponse(BaseModel):
+    workspace_id: str
+    total: int
+    returned: int
+    items: list[TaskListItemOut]
+
+
 class InterventionLogCreate(BaseModel):
     workspace_id: str
     action_type: str
     note: str = ""
+
+
+class AiPlatformSettingsOut(BaseModel):
+    """Decrypted credentials for trusted system admins editing the platform AI config."""
+
+    api_key: str = ""
+    model_id: str = ""
+    updated_at: datetime | None = None
+
+
+class AiPlatformSettingsPut(BaseModel):
+    api_key: str = ""
+    model_id: str = ""
+
+
+class OpenRouterModelBrief(BaseModel):
+    id: str
+    name: str = ""
+
+
+class OpenRouterModelsListResponse(BaseModel):
+    models: list[OpenRouterModelBrief]
+
+
+class AiOptionalApiKey(BaseModel):
+    """When empty or omitted, stored platform key from DB is used."""
+
+    api_key: str | None = None
+
+
+class AiTestConnectionResponse(BaseModel):
+    ok: bool = True
+    message: str = "OK"
+
+
+class AttentionExplainRequest(BaseModel):
+    source_task_id: str = Field(min_length=1)
+    model_id: str | None = None
+    include_subtasks: bool = False
+
+
+class AttentionExplainResponse(BaseModel):
+    run_id: str
+    workspace_id: str
+    source_task_id: str
+    model_id: str
+    summary: str
+    takeaways: list[str]
+    recommended_actions: list[str]
+    evidence_refs: list[str]
+    limitations: str = ""
+
+
+class TaskTimelineEntryOut(BaseModel):
+    task_source_id: str
+    from_status: str | None = None
+    to_status: str
+    transitioned_at: datetime
+
+
+class TaskDetailsOut(BaseModel):
+    workspace_id: str
+    source_task_id: str
+    include_subtasks: bool = False
+    descendant_task_ids: list[str] = Field(default_factory=list)
+    task: TaskListItemOut
+    transitions: list[TaskTimelineEntryOut] = Field(default_factory=list)
+
 

@@ -96,6 +96,8 @@ class ClickUpConnection(Base):
     selected_scope_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     selected_scope_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_sync_attempt_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_sync_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -116,6 +118,7 @@ class Task(Base):
     workspace_id: Mapped[str] = mapped_column(String(36), ForeignKey("workspaces.id"), index=True)
     connection_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("clickup_connections.id"), index=True, nullable=True)
     source_task_id: Mapped[str] = mapped_column(String(128), index=True)
+    parent_source_task_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     title: Mapped[str] = mapped_column(String(1024))
     task_type: Mapped[str | None] = mapped_column(Text, nullable=True)
     current_status: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -173,4 +176,49 @@ class InterventionLog(Base):
     action_type: Mapped[str] = mapped_column(String(64))
     note: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+# Singleton row (`id` fixed) — platform-wide AI provider config (system admins only).
+PLATFORM_AI_ROW_ID = "default"
+
+
+class PlatformAiSettings(Base):
+    __tablename__ = "platform_ai_settings"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    api_key_encrypted: Mapped[str] = mapped_column(Text, default="")
+    selected_model_id: Mapped[str] = mapped_column(String(512), default="")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
+class AiRun(Base):
+    __tablename__ = "ai_runs"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_id)
+    workspace_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("workspaces.id"), index=True, nullable=True)
+    user_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id"), index=True, nullable=True)
+    capability: Mapped[str] = mapped_column(String(128), index=True)
+    model_id: Mapped[str] = mapped_column(String(512), default="")
+    prompt_version: Mapped[str] = mapped_column(String(64), default="v1")
+    status: Mapped[str] = mapped_column(String(32), index=True, default="queued")
+    latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    usage_json: Mapped[str] = mapped_column(Text, default="{}")
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    input_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class AiOutput(Base):
+    __tablename__ = "ai_outputs"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_id)
+    run_id: Mapped[str] = mapped_column(String(36), ForeignKey("ai_runs.id"), index=True)
+    workspace_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("workspaces.id"), index=True, nullable=True)
+    capability: Mapped[str] = mapped_column(String(128), index=True)
+    entity_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    entity_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    summary: Mapped[str] = mapped_column(Text, default="")
+    output_json: Mapped[str] = mapped_column(Text, default="{}")
+    evidence_refs_json: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 

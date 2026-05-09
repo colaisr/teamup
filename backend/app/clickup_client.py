@@ -101,10 +101,17 @@ class ClickUpClient:
         resp.raise_for_status()
         return resp.json()
 
-    def get_tasks_from_list(self, list_id: str, date_created_gt_ms: int | None = None) -> list[dict[str, Any]]:
+    def get_tasks_from_list(
+        self,
+        list_id: str,
+        date_created_gt_ms: int | None = None,
+        date_updated_gt_ms: int | None = None,
+    ) -> list[dict[str, Any]]:
         params = {"include_closed": "true", "subtasks": "true", "page": 0}
-        if date_created_gt_ms:
+        if date_created_gt_ms is not None:
             params["date_created_gt"] = str(date_created_gt_ms)
+        if date_updated_gt_ms is not None:
+            params["date_updated_gt"] = str(date_updated_gt_ms)
 
         tasks: list[dict[str, Any]] = []
         while True:
@@ -119,7 +126,11 @@ class ClickUpClient:
         return tasks
 
     def get_tasks_from_team_space(
-        self, clickup_team_id: str, space_id: str, date_created_gt_ms: int | None = None
+        self,
+        clickup_team_id: str,
+        space_id: str,
+        date_created_gt_ms: int | None = None,
+        date_updated_gt_ms: int | None = None,
     ) -> list[dict[str, Any]]:
         page = 0
         merged: list[dict[str, Any]] = []
@@ -132,6 +143,8 @@ class ClickUpClient:
             ]
             if date_created_gt_ms is not None:
                 params.append(("date_created_gt", str(date_created_gt_ms)))
+            if date_updated_gt_ms is not None:
+                params.append(("date_updated_gt", str(date_updated_gt_ms)))
 
             resp = requests.get(
                 f"{self.base}/team/{clickup_team_id}/task",

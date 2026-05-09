@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import Link from "next/link";
+import { useState } from "react";
+import { api, explainApiError } from "@/lib/api";
 import { t } from "@/lib/i18n";
+import { isAnalyticsMappingBlockedMessage } from "@/lib/mappingBlocked";
+import { useActiveWorkspaceId } from "@/lib/workspace";
 
 type ImpactRow = {
   metric: string;
@@ -13,27 +16,36 @@ type ImpactRow = {
 };
 
 export default function ImpactPage() {
-  const [workspaceId, setWorkspaceId] = useState("");
+  const [workspaceId, setWorkspaceId] = useActiveWorkspaceId("");
   const [rows, setRows] = useState<ImpactRow[]>([]);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    setWorkspaceId(localStorage.getItem("teamup_workspace_id") || "");
-  }, []);
+  const [mappingBlocked, setMappingBlocked] = useState(false);
 
   async function saveSnapshot(type: "baseline" | "current") {
     if (!workspaceId) return;
-    await api(`/api/analytics/impact/snapshot/${workspaceId}?snapshot_type=${type}`, { method: "POST" });
+    setError("");
+    setMappingBlocked(false);
+    try {
+      await api(`/api/analytics/impact/snapshot/${workspaceId}?snapshot_type=${type}`, { method: "POST" });
+    } catch (err: unknown) {
+      const msg = explainApiError(err);
+      setError(msg);
+      setMappingBlocked(isAnalyticsMappingBlockedMessage(msg));
+    }
   }
 
   async function load() {
     if (!workspaceId) return;
     setError("");
+    setMappingBlocked(false);
     try {
       const payload = await api<{ metrics: ImpactRow[] }>(`/api/analytics/impact/${workspaceId}`);
       setRows(payload.metrics);
-    } catch (err: any) {
-      setError(err.message || "Failed");
+    } catch (err: unknown) {
+      const msg = explainApiError(err);
+      setError(msg);
+      setMappingBlocked(isAnalyticsMappingBlockedMessage(msg));
+      setRows([]);
     }
   }
 
@@ -61,7 +73,16 @@ export default function ImpactPage() {
           <p>Delta %: {row.delta_pct ?? "-"}</p>
         </div>
       ))}
-      {error && <p style={{ color: "#f87171" }}>{error}</p>}
+      {error && (
+        <div>
+          <p style={{ color: "#f87171" }}>{error}</p>
+          {mappingBlocked ? (
+            <p className="muted" style={{ marginTop: 8 }}>
+              <Link href="/settings/integrations">{t("nav.settings.integrations")}</Link>
+            </p>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }

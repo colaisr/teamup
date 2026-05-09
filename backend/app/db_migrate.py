@@ -28,6 +28,18 @@ def ensure_clickup_connection_clickup_team_id_column(engine: Engine) -> None:
             conn.execute(text("ALTER TABLE clickup_connections ADD COLUMN clickup_team_id VARCHAR(64) NULL"))
 
 
+def ensure_clickup_connection_sync_observability_columns(engine: Engine) -> None:
+    inspector = inspect(engine)
+    if "clickup_connections" not in inspector.get_table_names():
+        return
+    columns = {c["name"] for c in inspector.get_columns("clickup_connections")}
+    with engine.begin() as conn:
+        if "last_sync_attempt_at" not in columns:
+            conn.execute(text("ALTER TABLE clickup_connections ADD COLUMN last_sync_attempt_at TIMESTAMP NULL"))
+        if "last_sync_error" not in columns:
+            conn.execute(text("ALTER TABLE clickup_connections ADD COLUMN last_sync_error TEXT NULL"))
+
+
 def ensure_clickup_multi_connection_schema(engine: Engine) -> None:
     inspector = inspect(engine)
     tables = set(inspector.get_table_names())
@@ -71,18 +83,35 @@ def ensure_clickup_multi_connection_schema(engine: Engine) -> None:
     for table in ("clickup_raw_events", "tasks", "task_transitions", "workflow_mappings"):
         if table not in tables:
             continue
-        with engine.begin() as conn:
-            conn.execute(
-                text(
-                    f"""
-                    UPDATE {table} t
-                    SET connection_id = c.id
-                    FROM clickup_connections c
-                    WHERE t.connection_id IS NULL
-                      AND t.workspace_id = c.workspace_id
-                    """
-                )
+        if engine.dialect.name == "postgresql":
+            stmt = text(
+                f"""
+                UPDATE {table} t
+                SET connection_id = c.id
+                FROM clickup_connections c
+                WHERE t.connection_id IS NULL
+                  AND t.workspace_id = c.workspace_id
+                """
             )
+        else:
+            # SQLite (and generic): no UPDATE … FROM syntax.
+            stmt = text(
+                f"""
+                UPDATE {table}
+                SET connection_id = (
+                    SELECT c.id FROM clickup_connections c
+                    WHERE c.workspace_id = {table}.workspace_id
+                    ORDER BY c.updated_at DESC, c.id
+                    LIMIT 1
+                )
+                WHERE connection_id IS NULL
+                  AND EXISTS (
+                    SELECT 1 FROM clickup_connections c2 WHERE c2.workspace_id = {table}.workspace_id
+                  )
+                """
+            )
+        with engine.begin() as conn:
+            conn.execute(stmt)
 
 
 def ensure_tasks_task_type_text(engine: Engine) -> None:
@@ -101,3 +130,14 @@ def ensure_tasks_task_type_text(engine: Engine) -> None:
         ).scalar()
         if udt and udt != "text":
             conn.execute(text("ALTER TABLE tasks ALTER COLUMN task_type TYPE TEXT USING task_type::TEXT"))
+
+
+def ensure_tasks_parent_source_task_id_column(engine: Engine) -> None:
+    inspector = inspect(engine)
+    if "tasks" not in inspector.get_table_names():
+        return
+    columns = {c["name"] for c in inspector.get_columns("tasks")}
+    if "parent_source_task_id" in columns:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE tasks ADD COLUMN parent_source_task_id VARCHAR(128) NULL"))

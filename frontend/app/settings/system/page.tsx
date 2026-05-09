@@ -5,15 +5,17 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { t } from "@/lib/i18n";
 
+import SystemAiSettingsPanel from "./SystemAiSettingsPanel";
+
 type UserMe = {
   is_system_admin: boolean;
 };
 
-type TabId = "users" | "tab2" | "tab3" | "tab4" | "tab5";
+type TabId = "users" | "ai" | "tab3" | "tab4" | "tab5";
 
 const tabs: { id: TabId; labelKey: string; placeholderKey: string }[] = [
   { id: "users", labelKey: "settings.system.tab.users", placeholderKey: "settings.system.placeholder.users" },
-  { id: "tab2", labelKey: "settings.system.tab.tab2", placeholderKey: "settings.system.placeholder.tab2" },
+  { id: "ai", labelKey: "settings.system.tab.ai", placeholderKey: "settings.system.placeholder.ai" },
   { id: "tab3", labelKey: "settings.system.tab.tab3", placeholderKey: "settings.system.placeholder.tab3" },
   { id: "tab4", labelKey: "settings.system.tab.tab4", placeholderKey: "settings.system.placeholder.tab4" },
   { id: "tab5", labelKey: "settings.system.tab.tab5", placeholderKey: "settings.system.placeholder.tab5" }
@@ -87,7 +89,11 @@ export default function SystemSettingsPage() {
           background: "#0b1220"
         }}
       >
-        <p className="muted">{t(activePlaceholder)}</p>
+        {tab === "ai" ? (
+          <SystemAiSettingsPanel />
+        ) : (
+          <p className="muted">{t(activePlaceholder)}</p>
+        )}
       </div>
     </section>
   );

@@ -36,6 +36,8 @@ type Connection = {
   scope_name: string | null;
   clickup_team_id: string | null;
   last_synced_at: string | null;
+  last_sync_attempt_at: string | null;
+  last_sync_error: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -410,14 +412,18 @@ export default function IntegrationsSettingsClient() {
     }
   }
 
-  async function syncConnection(connectionId: string) {
+  async function syncConnection(connectionId: string, syncMode: "auto" | "full" = "auto") {
     setBusy(true);
     setImportingConnectionId(connectionId);
     setPageMessage("");
     try {
-      const res = await api<{ message: string }>(`/api/integrations/clickup/connections/${encodeURIComponent(connectionId)}/import`, {
-        method: "POST"
-      });
+      const qs = new URLSearchParams({ sync_mode: syncMode });
+      const res = await api<{ message: string }>(
+        `/api/integrations/clickup/connections/${encodeURIComponent(connectionId)}/import?${qs.toString()}`,
+        {
+          method: "POST"
+        }
+      );
       setPageMessage(res.message);
       await loadConnections();
     } catch (e: unknown) {
@@ -426,6 +432,11 @@ export default function IntegrationsSettingsClient() {
       setBusy(false);
       setImportingConnectionId(null);
     }
+  }
+
+  async function syncConnectionFull(connectionId: string) {
+    if (typeof window !== "undefined" && !window.confirm(t("integrations.confirmFullSync"))) return;
+    await syncConnection(connectionId, "full");
   }
 
   async function deleteConnection(connectionId: string) {
@@ -679,7 +690,7 @@ export default function IntegrationsSettingsClient() {
                 type="button"
                 disabled={busy || !wizardConnectionId}
                 aria-busy={importingConnectionId !== null && importingConnectionId === wizardConnectionId}
-                onClick={() => void syncConnection(wizardConnectionId)}
+                onClick={() => void syncConnection(wizardConnectionId, "auto")}
               >
                 {importingConnectionId === wizardConnectionId ? <span className="btnSpinner" aria-hidden /> : null}
                 {t("integrations.runHistoricalImport")}
@@ -720,19 +731,38 @@ export default function IntegrationsSettingsClient() {
                     <span className="muted" style={{ fontSize: 12 }}>
                       Статус: {c.setup_status === "ready" ? "готово" : "нужно завершить настройку"}
                       {c.last_synced_at ? ` · последний sync: ${formatApiUtcAsLocal(c.last_synced_at)}` : ""}
+                      {c.last_sync_attempt_at && (!c.last_synced_at || c.last_sync_attempt_at !== c.last_synced_at)
+                        ? ` · последняя попытка: ${formatApiUtcAsLocal(c.last_sync_attempt_at)}`
+                        : ""}
                     </span>
+                    {c.last_sync_error ? (
+                      <span className="muted" style={{ fontSize: 12, color: "#fb923c", whiteSpace: "pre-wrap" }}>
+                        {t("integrations.lastSyncError")}: {c.last_sync_error}
+                      </span>
+                    ) : null}
                   </div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <button
                       className="btn"
                       type="button"
                       disabled={busy || importingConnectionId !== null || !hasClickUpScope}
-                      title={!hasClickUpScope ? t("integrations.syncNeedsScope") : undefined}
+                      title={!hasClickUpScope ? t("integrations.syncNeedsScope") : t("integrations.syncIncrementalTitle")}
                       aria-busy={importingConnectionId === c.id}
-                      onClick={() => void syncConnection(c.id)}
+                      onClick={() => void syncConnection(c.id, "auto")}
                     >
                       {importingConnectionId === c.id ? <span className="btnSpinner" aria-hidden /> : null}
-                      Синхронизировать
+                      {t("integrations.syncIncremental")}
+                    </button>
+                    <button
+                      className="btn btnGhost"
+                      type="button"
+                      disabled={busy || importingConnectionId !== null || !hasClickUpScope}
+                      title={!hasClickUpScope ? t("integrations.syncNeedsScope") : t("integrations.syncFullTitle")}
+                      aria-busy={importingConnectionId === c.id}
+                      onClick={() => void syncConnectionFull(c.id)}
+                    >
+                      {importingConnectionId === c.id ? <span className="btnSpinner" aria-hidden /> : null}
+                      {t("integrations.syncFull")}
                     </button>
                     <button className="btn" type="button" disabled={busy} onClick={() => void openEditWizard(c)}>
                       Редактировать

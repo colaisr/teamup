@@ -1,7 +1,7 @@
 import json
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -27,6 +27,59 @@ from app.utils import get_workspace_membership, require_admin_or_owner
 router = APIRouter(prefix="/api/integrations", tags=["integrations"])
 
 NORMALIZED_STATUSES = {"Not Started", "Ready", "In Progress", "Review", "QA", "Blocked", "Done", "Cancelled"}
+
+_SYNC_HISTORY_DAYS = 90
+_INCREMENTAL_OVERLAP = timedelta(minutes=15)
+_SYNC_ERR_MAX_LEN = 4000
+
+
+def _sync_detail_str(detail: object) -> str:
+    if isinstance(detail, str):
+        return detail
+    return str(detail)
+
+
+def _record_sync_failure(db: Session, connection_id: str, attempt_at: datetime, err: str) -> None:
+    row = _get_connection_by_id(db, connection_id)
+    if not row:
+        return
+    row.last_sync_attempt_at = attempt_at
+    row.last_sync_error = (err or "")[:_SYNC_ERR_MAX_LEN]
+    db.add(row)
+    db.commit()
+
+
+def _normalize_import_sync_mode(sync_mode: str) -> str:
+    v = (sync_mode or "auto").strip().lower()
+    if v not in ("auto", "full", "incremental"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="sync_mode must be one of: auto, full, incremental",
+        )
+    return v
+
+
+def _import_time_window(sync_mode_norm: str, conn: ClickUpConnection) -> tuple[int | None, int | None, str]:
+    """Returns (date_created_gt_ms, date_updated_gt_ms, label for response)."""
+    full_created_cutoff = datetime.utcnow() - timedelta(days=_SYNC_HISTORY_DAYS)
+    full_created_ms = int(full_created_cutoff.timestamp() * 1000)
+
+    if sync_mode_norm == "full":
+        return full_created_ms, None, "full"
+
+    last = conn.last_synced_at
+
+    if sync_mode_norm == "incremental":
+        if last is None:
+            return full_created_ms, None, "full_fallback"
+        window_start = last - _INCREMENTAL_OVERLAP
+        return None, int(window_start.timestamp() * 1000), "incremental"
+
+    # auto
+    if last is not None:
+        window_start = last - _INCREMENTAL_OVERLAP
+        return None, int(window_start.timestamp() * 1000), "incremental"
+    return full_created_ms, None, "full"
 
 
 def _task_type_snapshot_from_clickup(task_payload: dict) -> str | None:
@@ -81,6 +134,8 @@ def _serialize_connection(conn: ClickUpConnection) -> ClickUpConnectionOut:
         scope_name=conn.selected_scope_name,
         clickup_team_id=conn.clickup_team_id,
         last_synced_at=conn.last_synced_at,
+        last_sync_attempt_at=conn.last_sync_attempt_at,
+        last_sync_error=conn.last_sync_error,
         created_at=conn.created_at,
         updated_at=conn.updated_at,
     )
@@ -115,14 +170,14 @@ def _save_scope_on_connection(conn: ClickUpConnection, payload: ClickUpScopeRequ
     conn.setup_status = "scope_selected"
 
 
-def _import_connection(db: Session, conn: ClickUpConnection) -> tuple[int, int]:
+def _import_connection(db: Session, conn: ClickUpConnection, *, sync_mode_norm: str) -> tuple[int, int, str]:
     if not conn.selected_scope_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Scope is not configured")
 
+    created_ms, updated_ms, used_label = _import_time_window(sync_mode_norm, conn)
+
     token = decrypt_value(conn.api_token_encrypted)
     client = ClickUpClient(token)
-    start = datetime.utcnow() - timedelta(days=90)
-    cutoff_ms = int(start.timestamp() * 1000)
     scope_kind = conn.selected_scope_type or "list"
 
     if scope_kind == "space":
@@ -131,9 +186,11 @@ def _import_connection(db: Session, conn: ClickUpConnection) -> tuple[int, int]:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="ClickUp team id is missing for space scope — re-save scope.",
             )
-        tasks = client.get_tasks_from_team_space(conn.clickup_team_id, conn.selected_scope_id, cutoff_ms)
+        tasks = client.get_tasks_from_team_space(
+            conn.clickup_team_id, conn.selected_scope_id, created_ms, updated_ms
+        )
     else:
-        tasks = client.get_tasks_from_list(conn.selected_scope_id, cutoff_ms)
+        tasks = client.get_tasks_from_list(conn.selected_scope_id, created_ms, updated_ms)
 
     imported = 0
     transitions = 0
@@ -161,6 +218,7 @@ def _import_connection(db: Session, conn: ClickUpConnection) -> tuple[int, int]:
             )
             db.add(task)
         task.title = task_payload.get("name", "")
+        task.parent_source_task_id = str(task_payload.get("parent")) if task_payload.get("parent") else None
         task.current_status = clickup_status_field_label(task_payload.get("status"))
         task.task_type = _task_type_snapshot_from_clickup(task_payload)
         task.assignee_email = (task_payload.get("assignees") or [{}])[0].get("email") if task_payload.get("assignees") else None
@@ -204,16 +262,20 @@ def _import_connection(db: Session, conn: ClickUpConnection) -> tuple[int, int]:
             )
             transitions += 1
 
+    conn.last_sync_attempt_at = now
+    conn.last_sync_error = None
     conn.last_synced_at = now
     db.add(
         ClickUpRawEvent(
             workspace_id=conn.workspace_id,
             connection_id=conn.id,
             event_type="clickup.import",
-            payload=json.dumps({"tasks": imported, "transitions": transitions}),
+            payload=json.dumps(
+                {"tasks": imported, "transitions": transitions, "sync_mode": used_label}
+            ),
         )
     )
-    return imported, transitions
+    return imported, transitions, used_label
 
 
 @router.post("/clickup/verify-token", response_model=ClickUpVerifyTokenResponse)
@@ -483,21 +545,30 @@ def get_connection_mapping(
 @router.post("/clickup/connections/{connection_id}/import", response_model=MessageResponse)
 def import_connection_tasks(
     connection_id: str,
+    sync_mode: str = Query("auto", description="auto | full | incremental"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     conn = _get_connection_for_admin(db, connection_id, current_user)
+    mode_norm = _normalize_import_sync_mode(sync_mode)
+    attempt_at = datetime.utcnow()
     try:
-        imported, transitions = _import_connection(db, conn)
-    except HTTPException:
+        imported, transitions, used_label = _import_connection(db, conn, sync_mode_norm=mode_norm)
+    except HTTPException as he:
+        db.rollback()
+        _record_sync_failure(db, conn.id, attempt_at, _sync_detail_str(he.detail))
         raise
     except Exception as exc:
+        db.rollback()
+        _record_sync_failure(db, conn.id, attempt_at, str(exc))
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Импорт не удался (ClickUp или данные задачи): {exc}",
         ) from exc
     db.commit()
-    return MessageResponse(message=f"Импорт завершен: задач={imported}, переходов={transitions}")
+    return MessageResponse(
+        message=f"Импорт завершен ({used_label}): задач={imported}, переходов={transitions}"
+    )
 
 
 @router.delete("/clickup/connections/{connection_id}", response_model=MessageResponse)
@@ -596,6 +667,7 @@ def get_scope_statuses_legacy(workspace_id: str, db: Session = Depends(get_db), 
 @router.post("/clickup/import/{workspace_id}", response_model=MessageResponse)
 def import_clickup_tasks_legacy(
     workspace_id: str,
+    sync_mode: str = Query("auto", description="auto | full | incremental"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -604,9 +676,25 @@ def import_clickup_tasks_legacy(
     conn = _latest_workspace_connection(db, workspace_id)
     if not conn:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="ClickUp connection not found")
-    imported, transitions = _import_connection(db, conn)
+    mode_norm = _normalize_import_sync_mode(sync_mode)
+    attempt_at = datetime.utcnow()
+    try:
+        imported, transitions, used_label = _import_connection(db, conn, sync_mode_norm=mode_norm)
+    except HTTPException as he:
+        db.rollback()
+        _record_sync_failure(db, conn.id, attempt_at, _sync_detail_str(he.detail))
+        raise
+    except Exception as exc:
+        db.rollback()
+        _record_sync_failure(db, conn.id, attempt_at, str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Импорт не удался (ClickUp или данные задачи): {exc}",
+        ) from exc
     db.commit()
-    return MessageResponse(message=f"Импорт завершен: задач={imported}, переходов={transitions}")
+    return MessageResponse(
+        message=f"Импорт завершен ({used_label}): задач={imported}, переходов={transitions}"
+    )
 
 
 @router.delete("/clickup/connection/{workspace_id}", response_model=MessageResponse)
