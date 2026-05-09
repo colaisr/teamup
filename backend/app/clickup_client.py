@@ -160,6 +160,59 @@ class ClickUpClient:
             page += 1
         return merged
 
+    def _raise_time_in_status_error(self, resp: requests.Response, exc: requests.HTTPError) -> None:
+        detail = resp.text[:500] if resp.text else str(exc)
+        raise RuntimeError(
+            "ClickUp time-in-status API failed. "
+            "Ensure the Total time in Status ClickApp is enabled for the workspace. "
+            f"Provider response: {detail}"
+        ) from exc
+
+    def get_task_time_in_status(self, task_id: str) -> dict[str, Any]:
+        """Fetch provider-owned status history/time-in-status for one ClickUp task ID."""
+        resp = requests.get(
+            f"{self.base}/task/{task_id}/time_in_status",
+            headers=self._headers(),
+            timeout=60,
+        )
+        try:
+            resp.raise_for_status()
+        except requests.HTTPError as exc:
+            self._raise_time_in_status_error(resp, exc)
+        payload = resp.json()
+        return payload if isinstance(payload, dict) else {}
+
+    def get_tasks_time_in_status(self, task_ids: list[str]) -> dict[str, Any]:
+        """Fetch provider-owned status history/time-in-status for up to 100 ClickUp task IDs."""
+        if not task_ids:
+            return {}
+        if len(task_ids) == 1:
+            task_id = task_ids[0]
+            return {task_id: self.get_task_time_in_status(task_id)}
+
+        params = [("task_ids", task_id) for task_id in task_ids]
+        resp = requests.get(
+            f"{self.base}/task/bulk_time_in_status/task_ids",
+            headers=self._headers(),
+            params=params,
+            timeout=60,
+        )
+        try:
+            resp.raise_for_status()
+        except requests.HTTPError as exc:
+            self._raise_time_in_status_error(resp, exc)
+        payload = resp.json()
+        if not isinstance(payload, dict):
+            return {}
+
+        if not payload and task_ids:
+            # ClickUp can return `{}` from bulk when Time in Status is unavailable.
+            # Probe one task to surface the provider's real error instead of a silent empty timeline.
+            first_task_id = task_ids[0]
+            return {first_task_id: self.get_task_time_in_status(first_task_id)}
+        return payload
+
+
 def parse_clickup_ts(ts: str | None) -> datetime | None:
     if not ts:
         return None

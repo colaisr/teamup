@@ -53,6 +53,7 @@ type TaskDetailsResponse = {
   descendant_task_ids: string[];
   task: TaskListItem;
   transitions: TaskTimelineEntry[];
+  transition_history_unavailable_reason?: string | null;
 };
 
 type VisibleTaskRow = {
@@ -487,6 +488,11 @@ export default function TasksPage() {
 
                 <div>
                   <strong>{t("tasks.transitionTimeline")}</strong>
+                  {details.transition_history_unavailable_reason ? (
+                    <p className="muted" style={{ marginBottom: 0 }}>
+                      {t("tasks.transitionsUnavailableProviderPlan")}
+                    </p>
+                  ) : null}
                   {details.transitions.length === 0 ? (
                     <p className="muted" style={{ marginBottom: 0 }}>
                       {t("tasks.noTransitions")}

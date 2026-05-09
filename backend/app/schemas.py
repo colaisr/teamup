@@ -286,5 +286,6 @@ class TaskDetailsOut(BaseModel):
     descendant_task_ids: list[str] = Field(default_factory=list)
     task: TaskListItemOut
     transitions: list[TaskTimelineEntryOut] = Field(default_factory=list)
+    transition_history_unavailable_reason: str | None = None
 
 

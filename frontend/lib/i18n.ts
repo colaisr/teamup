@@ -77,6 +77,8 @@ const ru: Dict = {
   "tasks.aiIncludeSubtasks": "ИИ: учитывать подзадачи в анализе",
   "tasks.explainWithAi": "Объяснить через ИИ",
   "tasks.transitionTimeline": "История смены статусов",
+  "tasks.transitionsUnavailableProviderPlan":
+    "История смены статусов недоступна у провайдера на текущем плане ClickUp.",
   "tasks.noTransitions": "Переходов нет.",
   "ai.fabOpen": "Помощник ИИ",
   "ai.panelTitle": "Помощник",
@@ -310,6 +312,8 @@ const en: Dict = {
   "tasks.aiIncludeSubtasks": "AI: include subtasks in analysis",
   "tasks.explainWithAi": "Explain with AI",
   "tasks.transitionTimeline": "Status transition history",
+  "tasks.transitionsUnavailableProviderPlan":
+    "Status transition history is not available from the provider on the current ClickUp plan.",
   "tasks.noTransitions": "No transitions.",
   "nav.settings.system": "System settings",
   "settings.system.tab.users": "Users",

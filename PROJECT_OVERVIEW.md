@@ -340,6 +340,7 @@ This section tracks **what is implemented in this repository** today. Product vi
 - **Import:** parses ClickUp **`status`** as string or nested object (**`clickup_status_field_label`**); **`tasks.task_type`** column migrated to **`TEXT`** on PostgreSQL (custom-field JSON longer than VARCHAR(64)); user-facing error detail on failed import commits when possible.
 - **Sync:** Available once a **Space/scope id** exists (mapping still required for `ready` and analytics access). Import endpoint accepts **`sync_mode=auto|incremental|full`**; `auto` uses incremental by `date_updated_gt` after last sync (with overlap), otherwise full ~90-day import. Integrations UI exposes **incremental** and **full** actions separately.
 - **Sync observability:** `clickup_connections` now stores **`last_sync_attempt_at`**, **`last_sync_error`**, **`last_synced_at`**; frontend displays last attempt/error, timestamps in **browser local time** via `formatApiUtcAsLocal`.
+- **Provider transition history:** sync now calls ClickUp **Time in Status** (`/task/{id}/time_in_status` and bulk `bulk_time_in_status`) as the provider source for status timeline rows. If ClickUp returns a plan/ClickApp limitation (for example `TIS_027`), task import still succeeds; the success message and latest import event record that transition history is unavailable for the current provider plan.
 - **Ingestion:** on-demand import is hardened and incremental-capable, but **no scheduled/background Celery sync loop yet**.
 
 ### Analytics and product UI (partial)
@@ -347,7 +348,7 @@ This section tracks **what is implemented in this repository** today. Product vi
 - **Metrics API:** `GET /api/analytics/metrics/{workspace_id}` — lead/cycle medians, rework/reopen-oriented signals, time-in-status rollup (subset of full MVP metric list); **normalized status mapping respects per-connection workflows** with fallback where `connection_id` is missing on older rows.
 - **Attention API:** `GET /api/analytics/attention/{workspace_id}` — scored tasks with textual explanations (rule-based v1).
 - **Analytics gate:** metrics/attention/impact and AI attention explain are blocked until workspace ClickUp mappings are fully configured across active connections.
-- **Tasks surface:** new **`/tasks`** page for debug + ops views — list/search/filter, parent/subtask hierarchy (expand/collapse and full-subtree controls), self/subtree attention columns, details slide-over with transition timeline.
+- **Tasks surface:** new **`/tasks`** page for debug + ops views — list/search/filter, parent/subtask hierarchy (expand/collapse and full-subtree controls), self/subtree attention columns, details slide-over with provider-backed transition timeline; when ClickUp does not expose Time in Status on the current plan, the details panel shows a localized provider-plan limitation message instead of implying a UI/data bug.
 - **App surfaces:** **`/dashboard`**, **`/tasks`**, **`/attention`**, **`/impact`** with workspace context; fuller dashboard parity (deep bottleneck cards, rich filters, trend charts) vs §9 MVP wording is **still open**.
 
 ### AI foundation (MVP+ scaffold, partial)
@@ -360,6 +361,7 @@ This section tracks **what is implemented in this repository** today. Product vi
 - **First product AI capability:** workspace endpoint **`POST /api/ai/attention/{workspace_id}/explain-task`** (`attention_task_explanation`) builds deterministic context, calls OpenRouter, returns structured narrative (`summary`, `takeaways`, `recommended_actions`, `limitations`, `evidence_refs`) and persists audit rows.
 - **Subtree-aware explain:** request flag `include_subtasks` extends context to task descendants (rolled-up reasons/score + combined transitions), used from tasks details panel.
 - **Frontend AI shell:** shared scaffolding added (`frontend/components/ai/*`, `frontend/lib/ai.ts`) with a global assistant panel and per-task “Explain with AI” action in `/attention`; generated blocks show takeaways/actions/evidence.
+- **Russian-first AI/tasks chrome:** `/tasks`, task details, floating AI assistant, AI action buttons, and generated AI blocks now resolve visible labels through the shared `t()` dictionaries (`ru` default, `en` fallback).
 - **Workspace context plumbing:** shared workspace helper (`frontend/lib/workspace.ts`) introduced so AI panel and analytics pages reuse one active workspace source instead of scattered `localStorage` reads.
 
 ### Gaps versus full MVP wording (§9)

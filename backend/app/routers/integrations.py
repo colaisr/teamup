@@ -31,6 +31,7 @@ NORMALIZED_STATUSES = {"Not Started", "Ready", "In Progress", "Review", "QA", "B
 _SYNC_HISTORY_DAYS = 90
 _INCREMENTAL_OVERLAP = timedelta(minutes=15)
 _SYNC_ERR_MAX_LEN = 4000
+_CLICKUP_TIME_IN_STATUS_BATCH_SIZE = 100
 
 
 def _sync_detail_str(detail: object) -> str:
@@ -80,6 +81,117 @@ def _import_time_window(sync_mode_norm: str, conn: ClickUpConnection) -> tuple[i
         window_start = last - _INCREMENTAL_OVERLAP
         return None, int(window_start.timestamp() * 1000), "incremental"
     return full_created_ms, None, "full"
+
+
+def _task_ids_from_clickup_payloads(tasks: list[dict]) -> list[str]:
+    ids: list[str] = []
+    seen: set[str] = set()
+    for task_payload in tasks:
+        source_id = task_payload.get("id")
+        if not source_id:
+            continue
+        task_id = str(source_id)
+        if task_id in seen:
+            continue
+        seen.add(task_id)
+        ids.append(task_id)
+    return ids
+
+
+def _fetch_clickup_time_in_status(client: ClickUpClient, task_ids: list[str]) -> tuple[dict[str, dict], str | None]:
+    by_task: dict[str, dict] = {}
+    warning: str | None = None
+    try:
+        for idx in range(0, len(task_ids), _CLICKUP_TIME_IN_STATUS_BATCH_SIZE):
+            batch = task_ids[idx : idx + _CLICKUP_TIME_IN_STATUS_BATCH_SIZE]
+            payload = client.get_tasks_time_in_status(batch)
+            for task_id, time_in_status in payload.items():
+                if isinstance(time_in_status, dict):
+                    by_task[str(task_id)] = time_in_status
+    except Exception as exc:
+        warning = str(exc)
+    return by_task, warning
+
+
+def _provider_transition_rows(source_id: str, time_in_status: dict | None) -> list[dict[str, object]]:
+    if not time_in_status:
+        return []
+
+    raw_entries = []
+    history = time_in_status.get("status_history") or []
+    if isinstance(history, list):
+        raw_entries.extend(item for item in history if isinstance(item, dict))
+
+    current_status = time_in_status.get("current_status")
+    if isinstance(current_status, dict):
+        raw_entries.append(current_status)
+
+    rows: list[dict[str, object]] = []
+    seen: set[tuple[str, datetime]] = set()
+    for item in raw_entries:
+        to_status = clickup_status_field_label(item.get("status"))
+        total_time = item.get("total_time")
+        since_raw = total_time.get("since") if isinstance(total_time, dict) else None
+        transitioned_at = parse_clickup_ts(str(since_raw) if since_raw is not None else None)
+        if not to_status or not transitioned_at:
+            continue
+        key = (to_status, transitioned_at)
+        if key in seen:
+            continue
+        seen.add(key)
+        rows.append(
+            {
+                "task_source_id": source_id,
+                "to_status": to_status,
+                "transitioned_at": transitioned_at,
+            }
+        )
+
+    rows.sort(key=lambda item: item["transitioned_at"])
+    prev_status: str | None = None
+    for row in rows:
+        row["from_status"] = prev_status
+        prev_status = str(row["to_status"])
+    return rows
+
+
+def _insert_transition_if_missing(
+    db: Session,
+    *,
+    workspace_id: str,
+    connection_id: str,
+    task_source_id: str,
+    from_status: str | None,
+    to_status: str,
+    transitioned_at: datetime,
+) -> bool:
+    exists = (
+        db.query(TaskTransition)
+        .filter(
+            TaskTransition.workspace_id == workspace_id,
+            TaskTransition.connection_id == connection_id,
+            TaskTransition.task_source_id == task_source_id,
+            TaskTransition.to_status == to_status,
+            TaskTransition.transitioned_at == transitioned_at,
+        )
+        .first()
+    )
+    if exists:
+        if exists.from_status is None and from_status is not None:
+            exists.from_status = from_status
+        return False
+
+    db.add(
+        TaskTransition(
+            workspace_id=workspace_id,
+            connection_id=connection_id,
+            task_source_id=task_source_id,
+            from_status=from_status,
+            to_status=to_status,
+            transitioned_at=transitioned_at,
+        )
+    )
+    return True
 
 
 def _task_type_snapshot_from_clickup(task_payload: dict) -> str | None:
@@ -170,7 +282,13 @@ def _save_scope_on_connection(conn: ClickUpConnection, payload: ClickUpScopeRequ
     conn.setup_status = "scope_selected"
 
 
-def _import_connection(db: Session, conn: ClickUpConnection, *, sync_mode_norm: str) -> tuple[int, int, str]:
+def _transition_history_warning_message(reason: str) -> str:
+    if "TIS_027" in reason or "Time In Status is not available on your plan" in reason:
+        return "история смены статусов недоступна у провайдера на текущем плане ClickUp"
+    return f"история смены статусов недоступна у провайдера для текущего плана ({reason})"
+
+
+def _import_connection(db: Session, conn: ClickUpConnection, *, sync_mode_norm: str) -> tuple[int, int, str, str | None]:
     if not conn.selected_scope_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Scope is not configured")
 
@@ -191,6 +309,10 @@ def _import_connection(db: Session, conn: ClickUpConnection, *, sync_mode_norm: 
         )
     else:
         tasks = client.get_tasks_from_list(conn.selected_scope_id, created_ms, updated_ms)
+
+    time_in_status_by_task, transition_warning = _fetch_clickup_time_in_status(
+        client, _task_ids_from_clickup_payloads(tasks)
+    )
 
     imported = 0
     transitions = 0
@@ -229,38 +351,22 @@ def _import_connection(db: Session, conn: ClickUpConnection, *, sync_mode_norm: 
         task.last_synced_at = now
         imported += 1
 
-        history = task_payload.get("status_history") or []
-        for item in history:
-            if not isinstance(item, dict):
+        for transition_row in _provider_transition_rows(source_id, time_in_status_by_task.get(source_id)):
+            from_status = transition_row.get("from_status")
+            transitioned_at = transition_row.get("transitioned_at")
+            if not isinstance(transitioned_at, datetime):
                 continue
-            at = parse_clickup_ts(item.get("date"))
-            to_status = clickup_status_field_label(item.get("status"))
-            if not at or not to_status:
-                continue
-            exists = (
-                db.query(TaskTransition)
-                .filter(
-                    TaskTransition.workspace_id == conn.workspace_id,
-                    TaskTransition.connection_id == conn.id,
-                    TaskTransition.task_source_id == source_id,
-                    TaskTransition.to_status == to_status,
-                    TaskTransition.transitioned_at == at,
-                )
-                .first()
+            inserted = _insert_transition_if_missing(
+                db,
+                workspace_id=conn.workspace_id,
+                connection_id=conn.id,
+                task_source_id=source_id,
+                from_status=from_status if isinstance(from_status, str) else None,
+                to_status=str(transition_row["to_status"]),
+                transitioned_at=transitioned_at,
             )
-            if exists:
-                continue
-            db.add(
-                TaskTransition(
-                    workspace_id=conn.workspace_id,
-                    connection_id=conn.id,
-                    task_source_id=source_id,
-                    from_status=None,
-                    to_status=to_status,
-                    transitioned_at=at,
-                )
-            )
-            transitions += 1
+            if inserted:
+                transitions += 1
 
     conn.last_sync_attempt_at = now
     conn.last_sync_error = None
@@ -271,11 +377,16 @@ def _import_connection(db: Session, conn: ClickUpConnection, *, sync_mode_norm: 
             connection_id=conn.id,
             event_type="clickup.import",
             payload=json.dumps(
-                {"tasks": imported, "transitions": transitions, "sync_mode": used_label}
+                {
+                    "tasks": imported,
+                    "transitions": transitions,
+                    "sync_mode": used_label,
+                    "transition_history_unavailable_reason": transition_warning,
+                }
             ),
         )
     )
-    return imported, transitions, used_label
+    return imported, transitions, used_label, transition_warning
 
 
 @router.post("/clickup/verify-token", response_model=ClickUpVerifyTokenResponse)
@@ -553,7 +664,9 @@ def import_connection_tasks(
     mode_norm = _normalize_import_sync_mode(sync_mode)
     attempt_at = datetime.utcnow()
     try:
-        imported, transitions, used_label = _import_connection(db, conn, sync_mode_norm=mode_norm)
+        imported, transitions, used_label, transition_warning = _import_connection(
+            db, conn, sync_mode_norm=mode_norm
+        )
     except HTTPException as he:
         db.rollback()
         _record_sync_failure(db, conn.id, attempt_at, _sync_detail_str(he.detail))
@@ -566,9 +679,10 @@ def import_connection_tasks(
             detail=f"Импорт не удался (ClickUp или данные задачи): {exc}",
         ) from exc
     db.commit()
-    return MessageResponse(
-        message=f"Импорт завершен ({used_label}): задач={imported}, переходов={transitions}"
-    )
+    message = f"Импорт завершен ({used_label}): задач={imported}, переходов={transitions}"
+    if transition_warning:
+        message += f"; {_transition_history_warning_message(transition_warning)}"
+    return MessageResponse(message=message)
 
 
 @router.delete("/clickup/connections/{connection_id}", response_model=MessageResponse)
@@ -679,7 +793,9 @@ def import_clickup_tasks_legacy(
     mode_norm = _normalize_import_sync_mode(sync_mode)
     attempt_at = datetime.utcnow()
     try:
-        imported, transitions, used_label = _import_connection(db, conn, sync_mode_norm=mode_norm)
+        imported, transitions, used_label, transition_warning = _import_connection(
+            db, conn, sync_mode_norm=mode_norm
+        )
     except HTTPException as he:
         db.rollback()
         _record_sync_failure(db, conn.id, attempt_at, _sync_detail_str(he.detail))
@@ -692,9 +808,10 @@ def import_clickup_tasks_legacy(
             detail=f"Импорт не удался (ClickUp или данные задачи): {exc}",
         ) from exc
     db.commit()
-    return MessageResponse(
-        message=f"Импорт завершен ({used_label}): задач={imported}, переходов={transitions}"
-    )
+    message = f"Импорт завершен ({used_label}): задач={imported}, переходов={transitions}"
+    if transition_warning:
+        message += f"; {_transition_history_warning_message(transition_warning)}"
+    return MessageResponse(message=message)
 
 
 @router.delete("/clickup/connection/{workspace_id}", response_model=MessageResponse)
