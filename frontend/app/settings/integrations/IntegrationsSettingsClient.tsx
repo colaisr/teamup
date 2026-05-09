@@ -1,10 +1,12 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { api, explainApiError } from "@/lib/api";
 import { formatApiUtcAsLocal } from "@/lib/datetime";
 import { t } from "@/lib/i18n";
+import { useActiveWorkspaceId } from "@/lib/workspace";
 
 type ConnectionsListResponse = {
   workspace_id: string;
@@ -65,13 +67,6 @@ const NORMALIZED_OPTIONS = [
   "Cancelled"
 ];
 
-function resolveWorkspaceId(inputState: string): string {
-  const a = inputState.trim();
-  if (a) return a;
-  if (typeof window !== "undefined") return (localStorage.getItem("teamup_workspace_id") || "").trim();
-  return "";
-}
-
 function tid(team: TeamRow): string {
   const raw = team.team_id ?? team.id;
   return raw !== undefined && raw !== null ? String(raw) : "";
@@ -117,6 +112,7 @@ function autoMapStatus(raw: string): string {
 }
 
 export default function IntegrationsSettingsClient() {
+  const [workspaceId] = useActiveWorkspaceId("");
   const [connections, setConnections] = useState<Connection[]>([]);
   const [impactWeeklyMeta, setImpactWeeklyMeta] = useState({
     enabled: false,
@@ -127,6 +123,7 @@ export default function IntegrationsSettingsClient() {
   const [busy, setBusy] = useState(false);
   const [pageMessage, setPageMessage] = useState("");
   const [documentReady, setDocumentReady] = useState(false);
+  const [quickFilter, setQuickFilter] = useState<"all" | "needsSetup" | "stale" | "errors">("all");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [wizardMode, setWizardMode] = useState<"add" | "edit">("add");
@@ -188,7 +185,7 @@ export default function IntegrationsSettingsClient() {
   }, [modalOpen, documentReady, closeWizard]);
 
   const loadConnections = useCallback(async () => {
-    const wid = resolveWorkspaceId("");
+    const wid = workspaceId.trim();
     if (!wid) {
       setConnections([]);
       setLoaded(true);
@@ -211,7 +208,7 @@ export default function IntegrationsSettingsClient() {
     } finally {
       setLoaded(true);
     }
-  }, []);
+  }, [workspaceId]);
 
   useEffect(() => {
     void loadConnections();
@@ -284,12 +281,12 @@ export default function IntegrationsSettingsClient() {
     void loadSpacesForConnection(wizardConnectionId, wizardTeamId).catch(() => {
       setWizardSpaces([]);
       setWizardSpaceId("");
-      setWizardHint("Не удалось загрузить список Space.");
+      setWizardHint(t("integrations.errorLoadSpaces"));
     });
   }, [modalOpen, wizardStep, wizardConnectionId, wizardTeamId, loadSpacesForConnection]);
 
   async function saveCredentialsAndContinue() {
-    const wid = resolveWorkspaceId("").trim();
+    const wid = workspaceId.trim();
     if (!wid) {
       setWizardHint(t("integrations.workspaceRequired"));
       return;
@@ -361,7 +358,7 @@ export default function IntegrationsSettingsClient() {
 
   async function saveScopeAndContinue() {
     if (!wizardConnectionId) {
-      setWizardHint("Сначала сохраните токен.");
+      setWizardHint(t("integrations.saveTokenFirst"));
       return;
     }
     const space = wizardSpaces.find((s) => String(s.id) === wizardSpaceId);
@@ -410,7 +407,7 @@ export default function IntegrationsSettingsClient() {
 
   async function saveMappingAndFinish() {
     if (!wizardConnectionId || !wizardScopeId || wizardMappingRows.length === 0) {
-      setWizardHint("Нет данных для сохранения маппинга.");
+      setWizardHint(t("integrations.mappingNoData"));
       return;
     }
     setMappingAction("save");
@@ -522,6 +519,27 @@ export default function IntegrationsSettingsClient() {
     }
   }
 
+  const summary = useMemo(() => {
+    const ready = connections.filter((c) => c.setup_status === "ready").length;
+    const needsSetup = connections.filter((c) => c.setup_status !== "ready").length;
+    const stale = connections.filter((c) => c.sync_is_stale).length;
+    const errors = connections.filter((c) => Boolean(c.last_sync_error)).length;
+    return {
+      total: connections.length,
+      ready,
+      needsSetup,
+      stale,
+      errors
+    };
+  }, [connections]);
+
+  const filteredConnections = useMemo(() => {
+    if (quickFilter === "all") return connections;
+    if (quickFilter === "needsSetup") return connections.filter((c) => c.setup_status !== "ready");
+    if (quickFilter === "stale") return connections.filter((c) => c.sync_is_stale);
+    return connections.filter((c) => Boolean(c.last_sync_error));
+  }, [connections, quickFilter]);
+
   const wizardModal = modalOpen ? (
     <div style={backdropStyle(true)} role="presentation" onMouseDown={(e) => e.target === e.currentTarget && closeWizard()}>
       <div role="dialog" aria-modal="true" aria-labelledby="integration-wizard-title" style={panelStyle()} onMouseDown={(e) => e.stopPropagation()}>
@@ -539,7 +557,7 @@ export default function IntegrationsSettingsClient() {
               : wizardStep === 2
                 ? t("integrations.wizard.stepScope")
                 : wizardStep === 3
-                  ? "Маппинг статусов"
+                  ? t("integrations.wizard.stepMapping")
                   : t("integrations.wizard.stepDone")}
         </p>
 
@@ -554,7 +572,12 @@ export default function IntegrationsSettingsClient() {
 
         {wizardStep === 1 ? (
           <div style={{ display: "grid", gap: 12 }}>
-            <input value={wizardConnectionName} onChange={(e) => setWizardConnectionName(e.target.value)} placeholder="Название подключения" disabled={credentialAction !== null || busy} />
+            <input
+              value={wizardConnectionName}
+              onChange={(e) => setWizardConnectionName(e.target.value)}
+              placeholder={t("integrations.connectionNamePlaceholder")}
+              disabled={credentialAction !== null || busy}
+            />
             <p className="muted" style={{ margin: 0, fontSize: 13 }}>
               {wizardMode === "edit" ? t("integrations.wizard.tokenMaskedEdit") : t("integrations.wizard.credentialsHelp")}
             </p>
@@ -620,7 +643,7 @@ export default function IntegrationsSettingsClient() {
                 onClick={() => void refreshWizardTeams()}
               >
                 {scopeAction === "teams" ? <span className="btnSpinner" aria-hidden /> : null}
-                Обновить команды
+                {t("integrations.refreshTeams")}
               </button>
               <button
                 className="btn"
@@ -669,7 +692,7 @@ export default function IntegrationsSettingsClient() {
         {wizardStep === 3 ? (
           <div style={{ display: "grid", gap: 10 }}>
             <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-              Сопоставьте статусы ClickUp с нормализованными статусами TeamUp. Шаг обязателен для завершения подключения.
+              {t("integrations.wizard.mappingHelp")}
             </p>
             {wizardMappingRows.map((row, idx) => (
               <div className="card" key={`${row.source_status}-${idx}`} style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -697,7 +720,7 @@ export default function IntegrationsSettingsClient() {
                 onClick={() => void saveMappingAndFinish()}
               >
                 {mappingAction === "save" ? <span className="btnSpinner" aria-hidden /> : null}
-                Сохранить маппинг и завершить
+                {t("integrations.wizard.saveMappingFinish")}
               </button>
             </div>
           </div>
@@ -705,7 +728,7 @@ export default function IntegrationsSettingsClient() {
 
         {wizardStep === 4 ? (
           <div style={{ display: "grid", gap: 12 }}>
-            <p style={{ margin: 0 }}>Подключение готово. Можно сразу запустить синхронизацию.</p>
+            <p style={{ margin: 0 }}>{t("integrations.wizard.doneMessage")}</p>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button
                 className="btn"
@@ -727,13 +750,73 @@ export default function IntegrationsSettingsClient() {
 
   if (!loaded) return <p className="muted">{t("common.loading")}</p>;
 
+  const workspaceReady = workspaceId.trim() !== "";
+
   return (
     <>
       <div style={{ display: "grid", gap: 16 }}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-          <h2 style={{ margin: 0, flex: 1, fontSize: 18, fontWeight: 700 }}>{t("integrations.connectionsHeading")}</h2>
-          <button className="btn" type="button" disabled={busy} onClick={() => void openAddWizard()}>{t("integrations.addConnection")}</button>
+        <div className="card" style={{ display: "grid", gap: 8 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-start", justifyContent: "space-between" }}>
+            <div style={{ display: "grid", gap: 6 }}>
+              <h2 style={{ margin: 0, fontSize: 22, lineHeight: 1.15 }}>{t("integrations.connectionsHeading")}</h2>
+              <p className="muted" style={{ margin: 0, maxWidth: 840 }}>
+                {t("integrations.managerIntro")}
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button className="btn btnGhost" type="button" disabled={busy} onClick={() => void loadConnections()}>
+                {t("integrations.refreshConnections")}
+              </button>
+              <button className="btn" type="button" disabled={busy || !workspaceReady} onClick={() => void openAddWizard()}>
+                {t("integrations.addConnection")}
+              </button>
+            </div>
+          </div>
         </div>
+
+        {!workspaceReady ? (
+          <div className="card" style={{ display: "grid", gap: 10 }}>
+            <strong>{t("integrations.noWorkspaceTitle")}</strong>
+            <p className="muted" style={{ margin: 0 }}>
+              {t("integrations.noWorkspaceBody")}
+            </p>
+            <div>
+              <Link href="/settings/user?tab=workspaces" className="btn">
+                {t("tasks.openWorkspaceSettings")}
+              </Link>
+            </div>
+          </div>
+        ) : null}
+
+        {workspaceReady ? (
+          <div
+            className="grid"
+            style={{
+              gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+              gap: 10
+            }}
+          >
+            {[
+              { key: "integrations.summary.total", value: summary.total },
+              { key: "integrations.summary.ready", value: summary.ready },
+              { key: "integrations.summary.needsSetup", value: summary.needsSetup },
+              { key: "integrations.summary.stale", value: summary.stale },
+              { key: "integrations.summary.errors", value: summary.errors }
+            ].map((item) => (
+              <div
+                key={item.key}
+                className="card"
+                style={{ padding: 12, display: "grid", gap: 4, background: "var(--panel-soft)", border: "1px solid var(--border)" }}
+              >
+                <span className="muted" style={{ fontSize: 12 }}>
+                  {t(item.key)}
+                </span>
+                <strong style={{ fontSize: 22 }}>{item.value}</strong>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
         {impactWeeklyMeta.enabled ? (
           <div className="card" style={{ padding: "10px 12px", fontSize: 13 }}>
             <p className="muted" style={{ margin: 0 }}>
@@ -743,28 +826,88 @@ export default function IntegrationsSettingsClient() {
             </p>
           </div>
         ) : null}
-        {connections.length === 0 ? (
-          <div className="card" style={{ textAlign: "center", padding: "20px 14px" }}>
-            <p className="muted" style={{ margin: 0 }}>{t("integrations.emptyState")}</p>
+
+        {workspaceReady ? (
+          <div className="card" style={{ display: "grid", gap: 10 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <span className="muted" style={{ fontSize: 12 }}>
+                {t("integrations.filterLabel")}:
+              </span>
+              {(["all", "needsSetup", "stale", "errors"] as const).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  className="btn"
+                  style={{
+                    padding: "5px 10px",
+                    background: quickFilter === f ? "var(--accent-strong)" : "var(--panel-soft)",
+                    border: `1px solid ${quickFilter === f ? "var(--accent)" : "var(--border)"}`,
+                    color: quickFilter === f ? "#fff" : "var(--text)"
+                  }}
+                  onClick={() => setQuickFilter(f)}
+                >
+                  {t(`integrations.filter.${f}`)}
+                </button>
+              ))}
+            </div>
+            <p className="muted" style={{ margin: 0 }}>
+              {t("integrations.totalPrefix")}: {connections.length} · {t("integrations.returnedPrefix")}: {filteredConnections.length}
+            </p>
           </div>
-        ) : (
+        ) : null}
+
+        {workspaceReady && filteredConnections.length === 0 ? (
+          <div className="card" style={{ textAlign: "center", padding: "20px 14px" }}>
+            <p className="muted" style={{ margin: 0 }}>
+              {connections.length === 0 ? t("integrations.emptyState") : t("integrations.noConnectionsForFilter")}
+            </p>
+          </div>
+        ) : null}
+
+        {workspaceReady && filteredConnections.length > 0 ? (
           <div style={{ display: "grid", gap: 10 }}>
-            {connections.map((c) => {
+            {filteredConnections.map((c) => {
               const hasClickUpScope = Boolean(String(c.scope_id ?? "").trim());
+              const isReady = c.setup_status === "ready";
+              const statusLabel = isReady ? t("integrations.setupReady") : t("integrations.setupIncomplete");
               return (
-              <div key={c.id} className="card" style={{ display: "grid", gap: 8 }}>
+              <div key={c.id} className="card" style={{ display: "grid", gap: 10 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                   <div style={{ display: "grid", gap: 4 }}>
-                    <strong>{c.name || "ClickUp"}</strong>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      <strong>{c.name || "ClickUp"}</strong>
+                      <span
+                        style={{
+                          display: "inline-block",
+                          borderRadius: 999,
+                          border: `1px solid ${isReady ? "var(--tone-success-border)" : "var(--tone-warning-border)"}`,
+                          background: isReady ? "var(--tone-success-bg)" : "var(--tone-warning-bg)",
+                          color: isReady ? "var(--tone-success-text)" : "var(--tone-warning-text)",
+                          padding: "3px 10px",
+                          fontSize: 12
+                        }}
+                      >
+                        {statusLabel}
+                      </span>
+                      {c.sync_is_stale ? (
+                        <span
+                          style={{
+                            display: "inline-block",
+                            borderRadius: 999,
+                            border: "1px solid var(--tone-warning-border)",
+                            background: "var(--tone-warning-bg)",
+                            color: "var(--tone-warning-text)",
+                            padding: "3px 10px",
+                            fontSize: 12
+                          }}
+                        >
+                          {t("integrations.syncStaleWarning")}
+                        </span>
+                      ) : null}
+                    </div>
                     <span className="muted" style={{ fontSize: 13 }}>
-                      {c.clickup_user_label ? `ClickUp: ${c.clickup_user_label}` : "ClickUp"} · {c.scope_name ? `Scope: ${c.scope_name}` : "Scope не выбран"}
-                    </span>
-                    <span className="muted" style={{ fontSize: 12 }}>
-                      Статус: {c.setup_status === "ready" ? "готово" : "нужно завершить настройку"}
-                      {c.last_synced_at ? ` · последний sync: ${formatApiUtcAsLocal(c.last_synced_at)}` : ""}
-                      {c.last_sync_attempt_at && (!c.last_synced_at || c.last_sync_attempt_at !== c.last_synced_at)
-                        ? ` · последняя попытка: ${formatApiUtcAsLocal(c.last_sync_attempt_at)}`
-                        : ""}
+                      {c.clickup_user_label ? `ClickUp: ${c.clickup_user_label}` : "ClickUp"} ·{" "}
+                      {c.scope_name ? `${t("integrations.card.scope")}: ${c.scope_name}` : t("integrations.scopeNotSelected")}
                     </span>
                     <span className="muted" style={{ fontSize: 12 }}>
                       {c.sync_scheduler_enabled
@@ -772,13 +915,24 @@ export default function IntegrationsSettingsClient() {
                         : t("integrations.schedulerDisabled")}
                       {c.sync_stale_after_at ? ` · ${t("integrations.schedulerStaleAfter")}: ${formatApiUtcAsLocal(c.sync_stale_after_at)}` : ""}
                     </span>
-                    {c.sync_is_stale ? (
-                      <span className="muted" style={{ fontSize: 12, color: "#fb923c" }}>
-                        {t("integrations.syncStaleWarning")}
-                      </span>
-                    ) : null}
+                    <span className="muted" style={{ fontSize: 12 }}>
+                      {c.last_synced_at ? `${t("integrations.lastSyncedAt")}: ${formatApiUtcAsLocal(c.last_synced_at)}` : t("integrations.lastSyncedAt") + ": —"}
+                      {c.last_sync_attempt_at && (!c.last_synced_at || c.last_sync_attempt_at !== c.last_synced_at)
+                        ? ` · ${t("integrations.lastAttemptAt")}: ${formatApiUtcAsLocal(c.last_sync_attempt_at)}`
+                        : ""}
+                    </span>
                     {c.last_sync_error ? (
-                      <span className="muted" style={{ fontSize: 12, color: "#fb923c", whiteSpace: "pre-wrap" }}>
+                      <span
+                        style={{
+                          fontSize: 12,
+                          whiteSpace: "pre-wrap",
+                          borderRadius: 8,
+                          border: "1px solid var(--tone-danger-border)",
+                          background: "var(--tone-danger-bg)",
+                          color: "var(--tone-danger-text)",
+                          padding: "8px 10px"
+                        }}
+                      >
                         {t("integrations.lastSyncError")}: {c.last_sync_error}
                       </span>
                     ) : null}
@@ -806,10 +960,20 @@ export default function IntegrationsSettingsClient() {
                       {importingConnectionId === c.id ? <span className="btnSpinner" aria-hidden /> : null}
                       {t("integrations.syncFull")}
                     </button>
-                    <button className="btn" type="button" disabled={busy} onClick={() => void openEditWizard(c)}>
-                      Редактировать
+                    <button className="btn btnGhost" type="button" disabled={busy} onClick={() => void openEditWizard(c)}>
+                      {t("integrations.editConnection")}
                     </button>
-                    <button className="btn" type="button" disabled={busy} onClick={() => void deleteConnection(c.id)}>
+                    <button
+                      className="btn btnGhost"
+                      type="button"
+                      style={{
+                        border: "1px solid var(--tone-danger-border)",
+                        color: "var(--tone-danger-text)",
+                        background: "var(--tone-danger-bg)"
+                      }}
+                      disabled={busy}
+                      onClick={() => void deleteConnection(c.id)}
+                    >
                       {t("integrations.disconnect")}
                     </button>
                   </div>
@@ -818,7 +982,7 @@ export default function IntegrationsSettingsClient() {
             );
             })}
           </div>
-        )}
+        ) : null}
 
         {pageMessage ? <p style={{ margin: 0, color: "var(--text)", fontSize: 14 }}>{pageMessage}</p> : null}
       </div>

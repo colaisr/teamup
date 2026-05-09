@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ImpactTrendCharts, type ImpactHistorySnapshot } from "@/components/impact/ImpactTrendCharts";
 import AnalyticsMappingBlockedCallout from "@/components/analytics/AnalyticsMappingBlockedCallout";
 import { api, explainApiError } from "@/lib/api";
@@ -59,29 +60,38 @@ function metricLabel(metric: string): string {
 }
 
 function directionColor(direction: ImpactRow["direction"]): string {
-  if (direction === "improved") return "#4ade80";
-  if (direction === "worsened") return "#fb7185";
-  return "var(--muted)";
+  if (direction === "improved") return "var(--tone-success-text)";
+  if (direction === "worsened") return "var(--tone-danger-text)";
+  return "var(--tone-neutral-text)";
 }
 
-function rowTint(direction: ImpactRow["direction"]): string {
-  if (direction === "improved") return "rgba(74, 222, 128, 0.07)";
-  if (direction === "worsened") return "rgba(251, 113, 133, 0.07)";
-  return "transparent";
+function directionTone(direction: ImpactRow["direction"]): { bg: string; border: string; text: string } {
+  if (direction === "improved") {
+    return { bg: "var(--tone-success-bg)", border: "var(--tone-success-border)", text: "var(--tone-success-text)" };
+  }
+  if (direction === "worsened") {
+    return { bg: "var(--tone-danger-bg)", border: "var(--tone-danger-border)", text: "var(--tone-danger-text)" };
+  }
+  return { bg: "var(--tone-neutral-bg)", border: "var(--tone-neutral-border)", text: "var(--tone-neutral-text)" };
 }
 
 export default function ImpactPage() {
-  const [workspaceId, setWorkspaceId] = useActiveWorkspaceId("");
+  const [workspaceId] = useActiveWorkspaceId("");
   const [rows, setRows] = useState<ImpactRow[]>([]);
   const [hasBaseline, setHasBaseline] = useState(false);
   const [commentary, setCommentary] = useState<ImpactResponse["commentary"]>({ improved: [], worsened: [] });
   const [historyRows, setHistoryRows] = useState<ImpactHistorySnapshot[]>([]);
   const [historySynced, setHistorySynced] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [snapshotAction, setSnapshotAction] = useState<"baseline" | "current" | null>(null);
+  const [showOnlyChanged, setShowOnlyChanged] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [error, setError] = useState("");
   const [mappingBlocked, setMappingBlocked] = useState(false);
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!workspaceId) return;
+    setBusy(true);
     setError("");
     setMappingBlocked(false);
     try {
@@ -102,11 +112,28 @@ export default function ImpactPage() {
       setCommentary({ improved: [], worsened: [] });
       setHistoryRows([]);
       setHistorySynced(false);
+    } finally {
+      setBusy(false);
     }
-  }
+  }, [workspaceId]);
+
+  useEffect(() => {
+    if (!workspaceId.trim()) {
+      setRows([]);
+      setHasBaseline(false);
+      setCommentary({ improved: [], worsened: [] });
+      setHistoryRows([]);
+      setHistorySynced(false);
+      setError("");
+      setMappingBlocked(false);
+      return;
+    }
+    void load();
+  }, [workspaceId, load]);
 
   async function saveSnapshot(type: "baseline" | "current") {
     if (!workspaceId) return;
+    setSnapshotAction(type);
     setError("");
     setMappingBlocked(false);
     try {
@@ -115,6 +142,8 @@ export default function ImpactPage() {
     } catch (err: unknown) {
       setError(explainApiError(err));
       setMappingBlocked(isAnalyticsMappingBlockedError(err));
+    } finally {
+      setSnapshotAction(null);
     }
   }
 
@@ -132,31 +161,108 @@ export default function ImpactPage() {
     return t("impact.narrativeMixed").replace("{i}", String(i)).replace("{w}", String(w));
   }
 
+  const workspaceReady = workspaceId.trim() !== "";
+  const visibleRows = useMemo(
+    () => (showOnlyChanged ? rows.filter((row) => row.direction !== "neutral") : rows),
+    [rows, showOnlyChanged]
+  );
+  const improvedCount = rows.filter((row) => row.direction === "improved").length;
+  const worsenedCount = rows.filter((row) => row.direction === "worsened").length;
+  const neutralCount = rows.filter((row) => row.direction === "neutral").length;
+
   return (
     <div className="grid">
-      <h1>{t("impact.title")}</h1>
-      <div className="card" style={{ display: "grid", gap: 10 }}>
-        <p className="muted" style={{ margin: 0 }}>
-          {t("impact.intro")}
-        </p>
-        <input value={workspaceId} onChange={(e) => setWorkspaceId(e.target.value)} placeholder={t("tasks.workspacePlaceholder")} />
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className="btn" onClick={() => saveSnapshot("baseline")}>
-            {t("impact.saveBaseline")}
-          </button>
-          <button className="btn" onClick={() => saveSnapshot("current")}>
-            {t("impact.saveCurrent")}
-          </button>
-          <button className="btn" onClick={load}>
-            {t("impact.compare")}
-          </button>
+      <h1 style={{ margin: 0 }}>{t("impact.title")}</h1>
+
+      <div className="card" style={{ display: "grid", gap: 12 }}>
+        <div style={{ display: "flex", gap: 10, justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap" }}>
+          <p className="muted" style={{ margin: 0, maxWidth: 760 }}>
+            {t("impact.intro")}
+          </p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="btn btnGhost" disabled={!workspaceReady || busy || snapshotAction !== null} onClick={() => void load()}>
+              {busy ? `${t("common.loading")}...` : t("impact.refresh")}
+            </button>
+            <button
+              className="btn"
+              disabled={!workspaceReady || busy || snapshotAction !== null}
+              aria-busy={snapshotAction === "baseline"}
+              onClick={() => void saveSnapshot("baseline")}
+            >
+              {snapshotAction === "baseline" ? <span className="btnSpinner" aria-hidden /> : null}
+              {t("impact.saveBaseline")}
+            </button>
+            <button
+              className="btn"
+              disabled={!workspaceReady || busy || snapshotAction !== null}
+              aria-busy={snapshotAction === "current"}
+              onClick={() => void saveSnapshot("current")}
+            >
+              {snapshotAction === "current" ? <span className="btnSpinner" aria-hidden /> : null}
+              {t("impact.saveCurrent")}
+            </button>
+          </div>
         </div>
       </div>
-      {!hasBaseline && rows.length > 0 ? (
-        <p className="muted" style={{ color: "#fb923c" }}>
-          {t("impact.noBaseline")}
-        </p>
+
+      {!workspaceReady ? (
+        <div className="card" style={{ display: "grid", gap: 10 }}>
+          <strong>{t("impact.noWorkspaceTitle")}</strong>
+          <p className="muted" style={{ margin: 0 }}>
+            {t("impact.noWorkspaceBody")}
+          </p>
+          <div>
+            <Link href="/settings/user?tab=workspaces" className="btn">
+              {t("tasks.openWorkspaceSettings")}
+            </Link>
+          </div>
+        </div>
       ) : null}
+
+      {workspaceReady ? (
+        <div
+          className="grid"
+          style={{
+            gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+            gap: 10
+          }}
+        >
+          {[
+            { key: "impact.summary.metrics", value: rows.length },
+            { key: "impact.summary.improved", value: improvedCount },
+            { key: "impact.summary.worsened", value: worsenedCount },
+            { key: "impact.summary.neutral", value: neutralCount },
+            { key: "impact.summary.snapshots", value: historyRows.length }
+          ].map((item) => (
+            <div
+              key={item.key}
+              className="card"
+              style={{ padding: 12, display: "grid", gap: 4, background: "var(--panel-soft)", border: "1px solid var(--border)" }}
+            >
+              <span className="muted" style={{ fontSize: 12 }}>
+                {t(item.key)}
+              </span>
+              <strong style={{ fontSize: 22 }}>{item.value}</strong>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {!hasBaseline && rows.length > 0 ? (
+        <div
+          style={{
+            borderRadius: 10,
+            border: "1px solid var(--tone-warning-border)",
+            background: "var(--tone-warning-bg)",
+            color: "var(--tone-warning-text)",
+            padding: "10px 12px",
+            fontSize: 14
+          }}
+        >
+          {t("impact.noBaseline")}
+        </div>
+      ) : null}
+
       {rows.length > 0 ? (
         <div className="card" style={{ display: "grid", gap: 16 }}>
           <div>
@@ -176,14 +282,7 @@ export default function ImpactPage() {
               gap: 12,
             }}
           >
-            <div
-              style={{
-                borderLeft: "3px solid #4ade80",
-                padding: "10px 12px",
-                borderRadius: 8,
-                background: "rgba(74, 222, 128, 0.06)",
-              }}
-            >
+            <div style={{ borderLeft: "3px solid var(--tone-success-border)", padding: "10px 12px", borderRadius: 8, background: "var(--tone-success-bg)" }}>
               <strong>{t("impact.improved")}</strong>
               <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.92rem", lineHeight: 1.45 }}>
                 {commentary.improved.length > 0
@@ -191,14 +290,7 @@ export default function ImpactPage() {
                   : t("impact.noImproved")}
               </p>
             </div>
-            <div
-              style={{
-                borderLeft: "3px solid #fb7185",
-                padding: "10px 12px",
-                borderRadius: 8,
-                background: "rgba(251, 113, 133, 0.06)",
-              }}
-            >
+            <div style={{ borderLeft: "3px solid var(--tone-danger-border)", padding: "10px 12px", borderRadius: 8, background: "var(--tone-danger-bg)" }}>
               <strong>{t("impact.worsened")}</strong>
               <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.92rem", lineHeight: 1.45 }}>
                 {commentary.worsened.length > 0
@@ -209,54 +301,89 @@ export default function ImpactPage() {
           </div>
         </div>
       ) : null}
-      {workspaceId && historySynced && historyRows.length > 0 ? (
-        <ImpactTrendCharts
-          snapshots={historyRows}
-          metricKeys={HISTORY_METRIC_ORDER}
-          metricLabel={metricLabel}
-          formatValue={formatMetricValue}
-        />
-      ) : null}
+
       {rows.length > 0 ? (
         <div className="card" style={{ display: "grid", gap: 12 }}>
-          <strong>{t("impact.compareTableTitle")}</strong>
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.92rem" }}>
-              <thead>
-                <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border)" }}>
-                  <th style={{ padding: "8px 10px" }}>{t("impact.col.metric")}</th>
-                  <th style={{ padding: "8px 10px" }}>{t("impact.col.direction")}</th>
-                  <th style={{ padding: "8px 10px" }}>{t("impact.baseline")}</th>
-                  <th style={{ padding: "8px 10px" }}>{t("impact.current")}</th>
-                  <th style={{ padding: "8px 10px" }}>{t("impact.delta")}</th>
-                  <th style={{ padding: "8px 10px" }}>{t("impact.deltaPct")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr
-                    key={row.metric}
-                    style={{
-                      borderBottom: "1px solid color-mix(in srgb, var(--border) 55%, transparent)",
-                      background: rowTint(row.direction),
-                    }}
-                  >
-                    <td style={{ padding: "8px 10px", fontWeight: 600 }}>{metricLabel(row.metric)}</td>
-                    <td style={{ padding: "8px 10px", color: directionColor(row.direction), fontWeight: 700 }}>
-                      {t(`impact.direction.${row.direction}`)}
-                    </td>
-                    <td style={{ padding: "8px 10px" }}>{formatMetricValue(row.metric, row.baseline)}</td>
-                    <td style={{ padding: "8px 10px" }}>{formatMetricValue(row.metric, row.current)}</td>
-                    <td style={{ padding: "8px 10px" }}>{formatMetricValue(row.metric, row.delta)}</td>
-                    <td style={{ padding: "8px 10px" }}>{row.delta_pct === null ? "—" : `${row.delta_pct}%`}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div style={{ display: "flex", gap: 8, justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
+            <strong>{t("impact.compareTableTitle")}</strong>
+            <button className="btn btnGhost" onClick={() => setShowOnlyChanged((prev) => !prev)}>
+              {showOnlyChanged ? t("impact.showAll") : t("impact.showOnlyChanged")}
+            </button>
           </div>
+          <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
+            {visibleRows.map((row) => {
+              const tone = directionTone(row.direction);
+              return (
+                <div key={row.metric} className="card" style={{ padding: 12, display: "grid", gap: 8, border: "1px solid var(--border)", background: "var(--panel-soft)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+                    <strong style={{ fontSize: 14 }}>{metricLabel(row.metric)}</strong>
+                    <span
+                      style={{
+                        display: "inline-block",
+                        borderRadius: 999,
+                        border: `1px solid ${tone.border}`,
+                        background: tone.bg,
+                        color: tone.text,
+                        padding: "3px 10px",
+                        fontSize: 12,
+                        fontWeight: 700
+                      }}
+                    >
+                      {t(`impact.direction.${row.direction}`)}
+                    </span>
+                  </div>
+                  <div className="muted" style={{ fontSize: 12 }}>
+                    {t("impact.baseline")}: {formatMetricValue(row.metric, row.baseline)}
+                  </div>
+                  <div className="muted" style={{ fontSize: 12 }}>
+                    {t("impact.current")}: {formatMetricValue(row.metric, row.current)}
+                  </div>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontSize: 13 }}>
+                    <span style={{ color: directionColor(row.direction), fontWeight: 700 }}>
+                      {t("impact.delta")}: {formatMetricValue(row.metric, row.delta)}
+                    </span>
+                    <span className="muted">
+                      {t("impact.deltaPct")}: {row.delta_pct === null ? "—" : `${row.delta_pct}%`}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {visibleRows.length === 0 ? (
+            <p className="muted" style={{ margin: 0 }}>
+              {t("impact.noChangedMetrics")}
+            </p>
+          ) : null}
         </div>
       ) : null}
+
       {workspaceId && historySynced ? (
+        <div className="card" style={{ display: "grid", gap: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <strong>{t("impact.trendsTitle")}</strong>
+            <button className="btn btnGhost" type="button" onClick={() => setHistoryOpen((prev) => !prev)}>
+              {historyOpen ? t("impact.hideHistoryAndTrends") : t("impact.showHistoryAndTrends")}
+            </button>
+          </div>
+          {historyOpen ? (
+            <>
+              {historyRows.length > 0 ? (
+                <ImpactTrendCharts
+                  snapshots={historyRows}
+                  metricKeys={HISTORY_METRIC_ORDER}
+                  metricLabel={metricLabel}
+                  formatValue={formatMetricValue}
+                  showHeader={false}
+                  asCard={false}
+                />
+              ) : null}
+            </>
+          ) : null}
+        </div>
+      ) : null}
+
+      {workspaceId && historySynced && historyOpen ? (
         <div className="card" style={{ display: "grid", gap: 10 }}>
           <strong>{t("impact.historyTitle")}</strong>
           {historyRows.length === 0 ? (
@@ -300,6 +427,7 @@ export default function ImpactPage() {
           )}
         </div>
       ) : null}
+
       {mappingBlocked ? <AnalyticsMappingBlockedCallout /> : null}
       {error && !mappingBlocked ? <p style={{ color: "#ef4444" }}>{error}</p> : null}
     </div>

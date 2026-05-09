@@ -149,23 +149,29 @@ export function ImpactTrendCharts({
   metricKeys,
   metricLabel,
   formatValue,
+  showHeader = true,
+  asCard = true,
 }: {
   snapshots: ImpactHistorySnapshot[];
   metricKeys: readonly string[];
   metricLabel: (metric: string) => string;
   formatValue: (metric: string, value: number) => string;
+  showHeader?: boolean;
+  asCard?: boolean;
 }) {
   const chrono = chronologicalSnapshots(snapshots);
   if (chrono.length === 0) return null;
 
-  return (
-    <div className="card" style={{ display: "grid", gap: 16 }}>
-      <div>
-        <strong>{t("impact.trendsTitle")}</strong>
-        <p className="muted" style={{ margin: "6px 0 0" }}>
-          {chrono.length < 2 ? t("impact.trendsHintShort") : t("impact.trendsHint")}
-        </p>
-      </div>
+  const content = (
+    <>
+      {showHeader ? (
+        <div>
+          <strong>{t("impact.trendsTitle")}</strong>
+          <p className="muted" style={{ margin: "6px 0 0" }}>
+            {chrono.length < 2 ? t("impact.trendsHintShort") : t("impact.trendsHint")}
+          </p>
+        </div>
+      ) : null}
       <div style={{ display: "grid", gap: 22 }}>
         {metricKeys.map((m, i) => (
           <MetricTrendChart
@@ -178,6 +184,16 @@ export function ImpactTrendCharts({
           />
         ))}
       </div>
+    </>
+  );
+
+  if (!asCard) {
+    return <div style={{ display: "grid", gap: 16 }}>{content}</div>;
+  }
+
+  return (
+    <div className="card" style={{ display: "grid", gap: 16 }}>
+      {content}
     </div>
   );
 }
