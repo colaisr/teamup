@@ -6,7 +6,9 @@
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
-    "lint": "next lint"
+    "lint": "next lint",
+    "i18n:check": "node scripts/check-i18n-keys.mjs",
+    "i18n:baseline": "node scripts/check-i18n-keys.mjs --write-baseline"
   },
   "dependencies": {
     "next": "14.2.16",

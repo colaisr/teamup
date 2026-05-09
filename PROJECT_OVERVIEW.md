@@ -352,7 +352,7 @@ This section tracks **what is implemented in this repository** today. Product vi
   - **Invite visibility:** **`GET .../invites?pending_only=true`** (pending) vs **`pending_only=false`** (full audit trail with **`pending` / `accepted` / `revoked`** statuses and timestamps).
 - **Shell UX:** authenticated layout — main nav (**dashboard, attention, impact, integrations**); workspace **switcher** in the sidebar footer; workspace **management** opens from the user card (**gear** → **`/settings/user`** → workspaces tab — no separate «Рабочие пространства» item in the main menu). **System admin** (`users.is_system_admin`) sees shield → **`/settings/system`** where implemented. Sidebar supports **collapse/expand** rail mode and uses a **viewport-safe sticky layout** (`100vh` / `100dvh`, internal nav scroll) so user card/workspace controls remain reachable without page-level scrolling. Global **dark/light theme** is user-controlled in **`/settings/user?tab=details`** and applied across shell/pages.
 - **Settings routes:** `/settings/workspace` and `/settings/members` redirect to **`/settings/user?tab=workspaces`**; `/settings/integrations`; onboarding **`/onboarding/clickup`**, **`/onboarding/mapping`**.
-- **CI:** GitHub Actions (`.github/workflows/ci.yml`): backend tests (`pytest`), `compileall`; frontend ESLint and `next build`. Auth-related pages wrap `useSearchParams` usage in **`Suspense`** for Next compatibility.
+- **CI:** GitHub Actions (`.github/workflows/ci.yml`): backend tests (`pytest`), `compileall`; frontend **i18n parity drift check** (`npm run i18n:check`), ESLint, and `next build`. Auth-related pages wrap `useSearchParams` usage in **`Suspense`** for Next compatibility.
 
 ### ClickUp integration (partial — multi-connection MVP surface)
 
@@ -395,7 +395,7 @@ This section tracks **what is implemented in this repository** today. Product vi
 
 ### Gaps versus full MVP wording (§9)
 
-- **Release hygiene and pilotization**: i18n key completeness checks + literal cleanup, pilot runbook execution with intervention logging/review, optional **Impact** extras (export/share, MVP+ **AI-assisted** impact narrative), PostgreSQL-heavy CI parity, and broader MVP+ AI capabilities (task-quality scoring, workspace narratives, full contextual chat sessions) — see [`MVP_IMPLEMENTATION_PLAN.md`](MVP_IMPLEMENTATION_PLAN.md) cross-cutting notes. **Heavyweight background job platforms and deep automated retry ladders are deferred past MVP closure** (same plan §3).
+- **Release hygiene and pilotization**: i18n drift guard is active in CI, but baseline key debt and literal cleanup remain; plus pilot runbook execution with intervention logging/review, optional **Impact** extras (export/share, MVP+ **AI-assisted** impact narrative), PostgreSQL-heavy CI parity, and broader MVP+ AI capabilities (task-quality scoring, workspace narratives, full contextual chat sessions) — see [`MVP_IMPLEMENTATION_PLAN.md`](MVP_IMPLEMENTATION_PLAN.md) cross-cutting notes. **Heavyweight background job platforms and deep automated retry ladders are deferred past MVP closure** (same plan §3).
 
 ---
 
