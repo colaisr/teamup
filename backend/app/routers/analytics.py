@@ -1,13 +1,12 @@
-from datetime import datetime, timedelta
-
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import get_current_user
-from app.models import InterventionLog, MetricSnapshot, User
+from app.models import InterventionLog, User
 from app.schemas import AttentionTaskOut, InterventionLogCreate, MessageResponse
 from app.services.analytics_engine import compute_attention_rows, compute_metrics_payload
+from app.services.impact_snapshots import latest_snapshot_values, save_metrics_snapshot
 from app.utils import get_workspace_membership
 from app.workspace_mapping_gate import raise_if_workspace_clickup_mappings_incomplete
 
@@ -46,26 +45,7 @@ def save_snapshot(
 ):
     get_workspace_membership(db, workspace_id, current_user.id)
     raise_if_workspace_clickup_mappings_incomplete(db, workspace_id)
-    metrics = compute_metrics_payload(db, workspace_id)
-    period_end = datetime.utcnow()
-    period_start = period_end - timedelta(days=28)
-    rows = [
-        ("median_lead_time_hours", metrics["median_lead_time_hours"]),
-        ("median_cycle_time_hours", metrics["median_cycle_time_hours"]),
-        ("rework_rate", metrics["rework_rate"]),
-        ("reopen_rate", metrics["reopen_rate"]),
-    ]
-    for name, value in rows:
-        db.add(
-            MetricSnapshot(
-                workspace_id=workspace_id,
-                snapshot_type=snapshot_type,
-                period_start=period_start,
-                period_end=period_end,
-                metric_name=name,
-                metric_value=str(value),
-            )
-        )
+    save_metrics_snapshot(db, workspace_id, snapshot_type)
     db.commit()
     return MessageResponse(message=f"Снимок метрик сохранен: {snapshot_type}")
 
@@ -78,17 +58,14 @@ def impact_compare(
 ):
     get_workspace_membership(db, workspace_id, current_user.id)
     raise_if_workspace_clickup_mappings_incomplete(db, workspace_id)
-    baseline = db.query(MetricSnapshot).filter(
-        MetricSnapshot.workspace_id == workspace_id, MetricSnapshot.snapshot_type == "baseline"
-    )
-    current = db.query(MetricSnapshot).filter(
-        MetricSnapshot.workspace_id == workspace_id, MetricSnapshot.snapshot_type == "current"
-    )
-    base_map = {m.metric_name: float(m.metric_value) for m in baseline.all()}
-    curr_map = {m.metric_name: float(m.metric_value) for m in current.all()}
+    base_map = latest_snapshot_values(db, workspace_id, "baseline")
+    curr_map = compute_metrics_payload(db, workspace_id)
     metrics = []
     for key, cur_v in curr_map.items():
+        if key == "workspace_id" or isinstance(cur_v, dict):
+            continue
         base_v = base_map.get(key, 0.0)
+        cur_v = float(cur_v)
         delta = round(cur_v - base_v, 4)
         delta_pct = round((delta / base_v) * 100, 2) if base_v else None
         metrics.append(
@@ -100,7 +77,11 @@ def impact_compare(
                 "delta_pct": delta_pct,
             }
         )
-    return {"workspace_id": workspace_id, "metrics": metrics}
+    return {
+        "workspace_id": workspace_id,
+        "has_baseline": bool(base_map),
+        "metrics": metrics,
+    }
 
 
 @router.post("/interventions", response_model=MessageResponse)

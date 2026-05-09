@@ -23,6 +23,7 @@ from app.schemas import (
     WorkflowMappingSaveRequest,
 )
 from app.security import decrypt_value, encrypt_value
+from app.services.impact_snapshots import ensure_baseline_snapshot
 from app.utils import get_workspace_membership, require_admin_or_owner
 
 router = APIRouter(prefix="/api/integrations", tags=["integrations"])
@@ -402,6 +403,7 @@ def _import_connection(db: Session, conn: ClickUpConnection, *, sync_mode_norm: 
             ),
         )
     )
+    ensure_baseline_snapshot(db, conn.workspace_id)
     return imported, transitions, used_label, transition_warning
 
 

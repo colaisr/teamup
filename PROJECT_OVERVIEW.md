@@ -350,6 +350,7 @@ This section tracks **what is implemented in this repository** today. Product vi
 - **Attention API:** `GET /api/analytics/attention/{workspace_id}` — scored tasks with textual explanations (rule-based v1).
 - **Analytics gate:** metrics/attention/impact and AI attention explain are blocked until workspace ClickUp mappings are fully configured across active connections.
 - **Tasks surface:** new **`/tasks`** page for debug + ops views — list/search/filter, parent/subtask hierarchy (expand/collapse and full-subtree controls), self/subtree attention columns, details slide-over with provider-backed transition timeline; when ClickUp does not expose Time in Status on the current plan, the details panel shows a localized provider-plan limitation message instead of implying a UI/data bug.
+- **Impact surface:** **`/impact`** compares current live metrics against the latest saved **baseline** snapshot; imports create the first baseline automatically once active workflow mappings exist. Users can still save baseline/current snapshots manually.
 - **App surfaces:** **`/dashboard`**, **`/tasks`**, **`/attention`**, **`/impact`** with workspace context; fuller dashboard parity (deep bottleneck cards, rich filters, trend charts) vs §9 MVP wording is **still open**.
 
 ### AI foundation (MVP+ scaffold, partial)
@@ -367,7 +368,7 @@ This section tracks **what is implemented in this repository** today. Product vi
 
 ### Gaps versus full MVP wording (§9)
 
-- Scheduled/background sync orchestration (beyond manual sync modes), deeper retry policy/alerts, baseline/value automation in Impact, PostgreSQL-heavy CI parity, and broader MVP+ AI capabilities (task-quality scoring, workspace/impact narratives, full contextual chat sessions) — see [`MVP_IMPLEMENTATION_PLAN.md`](MVP_IMPLEMENTATION_PLAN.md) cross-cutting notes.
+- Production-grade background sync orchestration, deeper retry policy/alerts, richer Impact commentary/trends, PostgreSQL-heavy CI parity, and broader MVP+ AI capabilities (task-quality scoring, workspace/impact narratives, full contextual chat sessions) — see [`MVP_IMPLEMENTATION_PLAN.md`](MVP_IMPLEMENTATION_PLAN.md) cross-cutting notes.
 
 ---
 

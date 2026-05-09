@@ -15,9 +15,30 @@ type ImpactRow = {
   delta_pct: number | null;
 };
 
+type ImpactResponse = {
+  workspace_id: string;
+  has_baseline: boolean;
+  metrics: ImpactRow[];
+};
+
+const IMPACT_METRIC_LABELS: Record<string, string> = {
+  median_lead_time_hours: "impact.metric.leadTime",
+  median_cycle_time_hours: "impact.metric.cycleTime",
+  rework_rate: "impact.metric.reworkRate",
+  reopen_rate: "impact.metric.reopenRate",
+  task_count: "impact.metric.taskCount",
+};
+
+function formatMetricValue(metric: string, value: number): string {
+  if (metric.endsWith("_rate")) return `${(value * 100).toFixed(1)}%`;
+  if (metric.endsWith("_hours")) return `${value.toFixed(1)} ${t("impact.unit.hours")}`;
+  return String(Math.round(value));
+}
+
 export default function ImpactPage() {
   const [workspaceId, setWorkspaceId] = useActiveWorkspaceId("");
   const [rows, setRows] = useState<ImpactRow[]>([]);
+  const [hasBaseline, setHasBaseline] = useState(false);
   const [error, setError] = useState("");
   const [mappingBlocked, setMappingBlocked] = useState(false);
 
@@ -39,38 +60,50 @@ export default function ImpactPage() {
     setError("");
     setMappingBlocked(false);
     try {
-      const payload = await api<{ metrics: ImpactRow[] }>(`/api/analytics/impact/${workspaceId}`);
+      const payload = await api<ImpactResponse>(`/api/analytics/impact/${workspaceId}`);
       setRows(payload.metrics);
+      setHasBaseline(payload.has_baseline);
     } catch (err: unknown) {
       const msg = explainApiError(err);
       setError(msg);
       setMappingBlocked(isAnalyticsMappingBlockedMessage(msg));
       setRows([]);
+      setHasBaseline(false);
     }
   }
 
   return (
     <div className="grid">
       <h1>{t("impact.title")}</h1>
-      <div className="card">
-        <input value={workspaceId} onChange={(e) => setWorkspaceId(e.target.value)} placeholder="workspace_id" />
+      <div className="card" style={{ display: "grid", gap: 10 }}>
+        <p className="muted" style={{ margin: 0 }}>
+          {t("impact.intro")}
+        </p>
+        <input value={workspaceId} onChange={(e) => setWorkspaceId(e.target.value)} placeholder={t("tasks.workspacePlaceholder")} />
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button className="btn" style={{ marginLeft: 8 }} onClick={() => saveSnapshot("baseline")}>
-          Сохранить baseline
+          {t("impact.saveBaseline")}
         </button>
         <button className="btn" style={{ marginLeft: 8 }} onClick={() => saveSnapshot("current")}>
-          Сохранить current
+          {t("impact.saveCurrent")}
         </button>
         <button className="btn" style={{ marginLeft: 8 }} onClick={load}>
-          Сравнить
+          {t("impact.compare")}
         </button>
+        </div>
       </div>
+      {!hasBaseline && rows.length > 0 ? (
+        <p className="muted" style={{ color: "#fb923c" }}>
+          {t("impact.noBaseline")}
+        </p>
+      ) : null}
       {rows.map((row) => (
         <div key={row.metric} className="card">
-          <strong>{row.metric}</strong>
-          <p>Baseline: {row.baseline}</p>
-          <p>Current: {row.current}</p>
-          <p>Delta: {row.delta}</p>
-          <p>Delta %: {row.delta_pct ?? "-"}</p>
+          <strong>{t(IMPACT_METRIC_LABELS[row.metric] || row.metric)}</strong>
+          <p>{t("impact.baseline")}: {formatMetricValue(row.metric, row.baseline)}</p>
+          <p>{t("impact.current")}: {formatMetricValue(row.metric, row.current)}</p>
+          <p>{t("impact.delta")}: {formatMetricValue(row.metric, row.delta)}</p>
+          <p>{t("impact.deltaPct")}: {row.delta_pct === null ? "—" : `${row.delta_pct}%`}</p>
         </div>
       ))}
       {error && (
